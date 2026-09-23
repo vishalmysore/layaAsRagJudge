@@ -2,6 +2,8 @@
 
 Browser-native RAG claim verification. A claim is checked against retrieved evidence, and the **Laya typed-decisions model** judges whether that evidence supports it: *supported* or *not supported*, with a probability and a confidence gate. Chunking, embedding, the vector store, retrieval and the judgment all run in the browser tab. There is no server, no API key and no cost, and no claim text leaves the page.
 
+**Live demo:** https://vishalmysore.github.io/layaAsRagJudge/ · **Article:** [Jev or Laya: LLM as Judge for RAG Applications — Live Demo](docs/article.md)
+
 Two pages:
 
 - **Verify a claim** (`index.html`): one claim through the whole pipeline, with each step shown: the retrieved passages and their cosine scores, the exact typed question and state sent to Laya, the probabilities, the AUTO / BLOCK / HOLD gate, and the source document with the retrieved passages highlighted. Evidence can come from one corpus document, the whole corpus, or text you paste.
