@@ -138,9 +138,9 @@ function show(res) {
   const verdict = verdictOf(res.pSupported, S.cutoff);
   const G = GATE_TEXT[g];
   const correct = gold ? verdict === gold : null;
-  $("outcome").innerHTML = `<div class="outcome ${G.cls}"><div class="k">${G.k}</div><div class="t">${esc(G.t)}</div>
+  $("outcome").innerHTML = `<div class="outcome ${G.cls}"><div class="k">${G.k}</div><div class="t">${g === "HOLD" ? `Leans “${verdict.replace("_", " ")}”, but not confident enough to act on` : esc(G.t)}</div>
     <div class="d">p(supported) ${num(res.pSupported)} ${verdict === "supported" ? "≥" : "<"} cutoff ${num(S.cutoff)} → <b>${verdict.replace("_", " ")}</b>; confidence ${num(res.confidence, 3)} ${res.confidence >= S.threshold ? "≥" : "<"} ${num(S.threshold)}. ${esc(G.d)}</div>
-    ${gold ? `<div class="verdictline">Gold label: <b>${gold.replace("_", " ")}</b> <span class="tag">${esc(res.kind || cl?.kind || "")}</span> ${correct ? '<span class="tag ok">judge is right</span>' : '<span class="tag bad">judge is wrong</span>'}${res.source === "recorded" ? ' <span class="tag warn">recorded result</span>' : ""}</div>` : res.source === "recorded" ? '<div class="verdictline"><span class="tag warn">recorded result</span></div>' : ""}
+    ${gold ? `<div class="verdictline">Answer key (sample claim): <b>${gold.replace("_", " ")}</b> <span class="tag">${esc(res.kind || cl?.kind || "")}</span> ${correct ? '<span class="tag ok">verdict matches the answer key</span>' : '<span class="tag bad">verdict is wrong</span>'}${res.source === "recorded" ? ' <span class="tag warn">recorded result</span>' : ""}</div>` : res.source === "recorded" ? '<div class="verdictline"><span class="tag warn">recorded result</span></div>' : ""}
   </div>`;
 
   const hit = evidence ? evidenceRetrieved(res.passages, evidence) : null;

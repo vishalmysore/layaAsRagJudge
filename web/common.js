@@ -98,5 +98,5 @@ export function bars(probs, selected) {
 export const GATE_TEXT = {
   AUTO: { cls: "auto", k: "AUTO · supported", t: "Evidence supports the claim", d: "Confident enough to show the answer with its citation." },
   BLOCK: { cls: "block", k: "BLOCK · not supported", t: "Evidence does not support the claim", d: "Confident enough to withhold or regenerate the answer." },
-  HOLD: { cls: "human", k: "HOLD · review", t: "Judge is unsure", d: "Below the confidence threshold, so a person reviews it." },
+  HOLD: { cls: "human", k: "HOLD · review", t: "Not confident enough to act on", d: "Below the confidence threshold, so a person reviews it." },
 };
