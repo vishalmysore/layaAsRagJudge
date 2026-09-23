@@ -4,6 +4,7 @@
 import * as db from "./store.js";
 import { chunkText, chunkConfigKey, topK, evidenceRetrieved, RAG_DEFAULTS } from "./rag.js";
 import { PRESETS, buildState, interpret, questionKey } from "./judge.js";
+import { buildSequence, toInternal } from "./laya-core.js";
 
 const CORPUS_URL = "./corpus.json";
 
@@ -72,8 +73,8 @@ export async function retrieve(embedder, claim, { rag = RAG_DEFAULTS, docId = nu
   const { vec, ms } = await claimVector(embedder, claim);
   const t0 = performance.now();
   const items = pool || await db.passages(passageCfg(embedder, rag), rag.scope === "corpus" ? null : docId);
-  const hits = topK(vec, items, rag.k).map(({ item, score }) => ({ docId: item.docId, chunk: item.chunk, text: item.text, score }));
-  return { passages: hits, candidates: items.length, embedMs: ms, searchMs: performance.now() - t0 };
+  const ranked = topK(vec, items, items.length).map(({ item, score }) => ({ docId: item.docId, chunk: item.chunk, text: item.text, score }));
+  return { passages: ranked.slice(0, rag.k), ranked, candidates: items.length, embedMs: ms, searchMs: performance.now() - t0 };
 }
 
 /** Ask Laya one typed question: does the evidence support the claim? */
@@ -82,7 +83,18 @@ export async function judge(laya, claim, passages, presetId) {
   const state = buildState(claim, passages);
   const res = await laya.systemOne(state, { verdict: preset.question });
   const answer = res.answers.verdict;
-  return { ...interpret(answer, presetId), answer, state, question: preset.question, layaMs: res.latency_ms, tokens: res.usage?.input_tokens };
+  return { ...interpret(answer, presetId), answer, state, question: preset.question, layaMs: res.latency_ms, tokens: res.usage?.input_tokens, input: modelInput(laya, state, preset.question) };
+}
+
+/**
+ * The exact token sequence Laya reads for this question, decoded back to text: the same buildSequence() call that
+ * systemOne() makes, so special tokens ([CLS] [SEP] and one [MASK] per option) and any truncation are visible.
+ */
+export function modelInput(laya, state, question) {
+  const cfg = laya.cfg;
+  const { ids, markers } = buildSequence(laya.tok, laya.sp, state, toInternal(question), cfg.max_len ?? 512, cfg.head_max_len ?? 192);
+  const tokens = ids.map((id) => laya.tok.decode([id], { skip_special_tokens: false }));
+  return { ids, markers, text: laya.tok.decode(ids, { skip_special_tokens: false }), tokens, maxLen: cfg.max_len ?? 512, truncated: ids.length >= (cfg.max_len ?? 512) };
 }
 
 /** Embed and index a pasted evidence text in memory (not stored), for the "your own evidence" mode. */

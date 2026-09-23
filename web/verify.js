@@ -2,6 +2,7 @@
 import { $, esc, num, settings, M, onModelsReady, initModelCard, loadRecorded, pillIdle, bars, GATE_TEXT } from "./common.js";
 import { loadCorpus, indexCorpus, retrieve, judge, adHocPool, runKey, evidenceRetrieved, expandRecorded } from "./pipeline.js";
 import { PRESETS, DEFAULT_PRESET, DEFAULT_THRESHOLD, gate, verdictOf } from "./judge.js";
+import { chunkText } from "./rag.js";
 
 const S = {
   corpus: null, recorded: null, last: null, busy: false, indexed: new Set(),
@@ -113,7 +114,7 @@ async function verify() {
     const j = await judge(M.laya, claim, ret.passages, preset());
     const cl = S.selected && S.selected.claim === claim ? S.selected : null;
     show({
-      source: "model", claim, passages: ret.passages, candidates: ret.candidates, embedMs: ret.embedMs, searchMs: ret.searchMs,
+      source: "model", claim, passages: ret.passages, ranked: ret.ranked, input: j.input, candidates: ret.candidates, embedMs: ret.embedMs, searchMs: ret.searchMs,
       pSupported: j.pSupported, confidence: j.confidence, probabilities: j.probabilities, layaMs: j.layaMs, tokens: j.tokens,
       question: j.question, state: j.state, rag: r, docId: src === "pasted" ? null : (r.scope === "corpus" ? null : docId), pasted: src === "pasted" ? $("pasted").value : null,
       gold: cl?.label, kind: cl?.kind, evidence: cl?.evidence, id: cl?.id, presetId: preset(),
@@ -156,6 +157,8 @@ function show(res) {
   const sel = Object.entries(res.probabilities).sort((a, b) => b[1] - a[1])[0][0];
   $("probs").innerHTML = bars(res.probabilities, sel);
   $("qjson").textContent = JSON.stringify({ question: res.question, state: res.state }, null, 2);
+  renderInput(res);
+  renderAll(res, evidence);
 
   // Source document with retrieved passages marked (one document, or each document that contributed).
   const docIds = res.pasted != null ? [] : [...new Set(res.passages.map((p) => p.docId))];
@@ -172,6 +175,39 @@ function show(res) {
   }
   $("evNote").textContent = evidence ? "; the gold evidence span is underlined" : "";
   markActive(); hint();
+}
+
+/** Every passage in the search pool, ranked, so you can see what the top-k was chosen from and where it was cut. */
+function renderAll(res, evidence) {
+  let list = res.ranked, note;
+  if (!list) {
+    // recorded results store only the top-k; rebuild the document's passages (no scores for the rest)
+    const docId = res.docId || res.passages[0]?.docId;
+    const doc = docId && S.corpus.documents[docId];
+    list = doc ? chunkText(doc.text, res.rag).map((c) => ({ docId, chunk: c.index, text: c.text, score: res.passages.find((p) => p.docId === docId && p.chunk === c.index)?.score ?? null })) : [];
+    note = "Recorded result: only the top-k scores were stored. Load the models and verify again to see every score.";
+  } else note = `Ranked by cosine similarity to the claim. The first ${res.passages.length} (above the line) went to Laya.`;
+  $("allSum").textContent = `Every passage the claim was compared against (${list.length})`;
+  $("allNote").textContent = note;
+  const k = res.passages.length, sent = new Set(res.passages.map((p) => `${p.docId}|${p.chunk}`));
+  $("allPassages").innerHTML = list.slice(0, 40).map((p, i) => {
+    const used = sent.has(`${p.docId}|${p.chunk}`);
+    return `<li class="passage" style="${used ? "" : "opacity:.6"}${res.ranked && i === k ? ";border-top:2px dashed var(--accent)" : ""}"><span class="rank">${res.ranked ? i + 1 : p.chunk + 1}</span><div>
+      <div class="src"><span>${esc(S.corpus.documents[p.docId]?.title || "Your text")} · passage ${p.chunk + 1}</span>${p.score != null ? `<span>cos ${p.score.toFixed(3)}</span>` : ""}${used ? '<span class="tag ok">sent to Laya</span>' : '<span class="tag">not sent</span>'}</div>
+      <div class="txt">${highlight(p.text, evidence)}</div></div></li>`;
+  }).join("") + (list.length > 40 ? `<li class="hint">…and ${list.length - 40} more.</li>` : "");
+}
+
+/** The literal model input, with the special tokens that structure it called out. */
+function renderInput(res) {
+  const inp = res.input;
+  if (!inp) {
+    $("seqNote").textContent = "This is a recorded result. The decoded token sequence needs Laya's tokenizer: load the models and verify again.";
+    $("seqText").textContent = "";
+    return;
+  }
+  $("seqNote").innerHTML = `${inp.ids.length} tokens (limit ${inp.maxLen})${inp.truncated ? ' · <b>truncated: the end of the evidence was cut off</b>' : ""}. Layout: <code>[CLS]</code> question <code>[SEP]</code> one <code>[MASK]</code> per option (Laya scores each option at its [MASK]) <code>[SEP]</code> state as JSON <code>[SEP]</code>.`;
+  $("seqText").textContent = inp.text.replace(/\s*(\[SEP\])\s*/g, "\n$1\n").replace(/\s*(\[MASK\])/g, "\n$1").trim();
 }
 
 function highlight(text, ev) {
