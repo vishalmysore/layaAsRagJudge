@@ -1,0 +1,57 @@
+name: Test and deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests (chunking, retrieval, judge, metrics, corpus)
+        run: npm test
+
+      # The models are NOT bundled here: the pages stream Laya from Hugging Face
+      # (VishalMysore/layaForWebTrained) and the embedder from Xenova/all-MiniLM-L6-v2, so the site stays ~30 MB.
+      - name: Assemble the site
+        run: node scripts/prepare_site.mjs
+
+      - name: Check the model repository is reachable
+        run: curl -fsSL https://huggingface.co/VishalMysore/layaForWebTrained/resolve/main/manifest.json | head -c 200
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

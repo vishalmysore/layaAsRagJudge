@@ -1,0 +1,17 @@
+{
+  "name": "laya-as-rag-judge",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Browser-native RAG claim verification: MiniLM embeddings + IndexedDB vector store for retrieval, the Laya typed-decisions model as the supported / not-supported judge",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "prepare-site": "node scripts/prepare_site.mjs",
+    "serve": "python serve.py"
+  },
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
+    "onnxruntime-web": "1.30.0"
+  }
+}

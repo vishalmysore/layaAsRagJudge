@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laya RAG Judge</title>
+<meta name="description" content="Browser-native RAG claim verification: MiniLM retrieval over an IndexedDB vector store, with the Laya typed-decision model judging whether the evidence supports the claim. Nothing leaves the page.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f766e'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="./coi.js"></script>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect width="32" height="32" rx="7" class="logo-bg"/><path d="M9 16.5l4.5 4.5L23 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <h1>Laya RAG Judge</h1>
+      <p>Retrieve evidence, then let a typed-decision model judge the claim, in your browser</p>
+    </div>
+  </div>
+  <div class="topright">
+    <nav class="nav" aria-label="Pages"><a href="./index.html" aria-current="page">Verify a claim</a><a href="./rag-eval.html">Evaluate</a></nav>
+    <div class="modelpill" id="modelPill" role="status"><span class="dot"></span><span id="modelPillText">Models not loaded</span></div>
+  </div>
+</header>
+
+<section class="card modelcard" id="modelCard">
+  <div class="modelrow">
+    <div class="field">
+      <label for="variant">Judge model build (Laya)</label>
+      <select id="variant"><option>Reading manifest…</option></select>
+    </div>
+    <div class="field">
+      <label for="backend">Backend</label>
+      <select id="backend">
+        <option value="auto">Auto (WebGPU for int4, else WASM)</option>
+        <option value="wasm">WASM (CPU)</option>
+        <option value="webgpu">WebGPU (int4 build only)</option>
+      </select>
+    </div>
+    <button id="loadBtn" class="primary" disabled>Load models</button>
+  </div>
+  <div class="progress" id="progress" hidden><div id="progressBar"></div></div>
+  <p class="status" id="status">Judge: <a id="modelLink" target="_blank" rel="noopener"></a>. Retriever: <a id="embedLink" target="_blank" rel="noopener"></a><span id="embedState"></span>. Both download once and are cached by your browser. Until then, the built-in claims play back results recorded from the same models.</p>
+  <div class="badges" id="badges"></div>
+</section>
+
+<div class="layout">
+  <aside class="side">
+    <section class="card">
+      <div class="field">
+        <label for="dataset">Sample claims</label>
+        <select id="dataset"></select>
+      </div>
+      <div class="examples" id="examples" aria-label="Example claims"></div>
+      <div class="field">
+        <label for="claim">Claim to verify</label>
+        <textarea id="claim" rows="3" spellcheck="false" placeholder="A sentence an AI assistant wrote, to check against the evidence"></textarea>
+      </div>
+      <div class="field">
+        <label id="sourceLbl">Search for evidence in</label>
+        <div class="seg" role="radiogroup" aria-labelledby="sourceLbl">
+          <label><input type="radio" name="source" value="document" checked>One document</label>
+          <label><input type="radio" name="source" value="corpus">Whole corpus</label>
+          <label><input type="radio" name="source" value="pasted">My own text</label>
+        </div>
+      </div>
+      <div class="field" id="docField">
+        <label for="doc">Document</label>
+        <select id="doc"></select>
+      </div>
+      <div class="field" id="pasteField" hidden>
+        <label for="pasted">Evidence text (chunked and embedded in memory, not stored)</label>
+        <textarea id="pasted" rows="6" spellcheck="false" placeholder="Paste a few paragraphs of source text"></textarea>
+      </div>
+      <details>
+        <summary>Retrieval and judge settings</summary>
+        <div class="row3" style="margin-top:8px">
+          <div class="field"><label for="spc">Sentences / chunk</label><select id="spc"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+          <div class="field"><label for="k">Top-k</label><select id="k"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+          <div class="field"><label for="preset">Question</label><select id="preset"></select></div>
+        </div>
+        <p class="hint" id="presetHint"></p>
+      </details>
+      <div class="field" style="margin-top:12px">
+        <label for="cutoff">Say "supported" when p(supported) ≥ <b id="cutoffVal">0.50</b></label>
+        <input type="range" id="cutoff" min="0.05" max="0.95" step="0.01" value="0.5">
+      </div>
+      <div class="field">
+        <label for="thresh">Confidence needed to act automatically: <b id="threshVal">0.10</b></label>
+        <input type="range" id="thresh" min="0" max="0.6" step="0.01" value="0.1">
+        <p class="hint">Confidence is 1 − normalized entropy of the supported / not-supported split. This model's probabilities are compressed, so useful bars are low (0.05–0.3). Below the bar, the verdict is held for review. Both sliders re-route the current result instantly, with no model call.</p>
+      </div>
+      <div class="btnrow">
+        <button id="verifyBtn" class="primary">Verify claim</button>
+      </div>
+      <p class="hint" id="runHint"></p>
+    </section>
+  </aside>
+
+  <main class="main">
+    <section class="card" id="resultCard">
+      <div class="placeholder" id="placeholder">Pick a sample claim or write your own, then press <b>Verify claim</b>.</div>
+      <div id="result" hidden>
+        <div id="outcome"></div>
+        <h3 class="step">1 · Retrieved evidence <span class="meta" id="retrMeta"></span></h3>
+        <ol class="passages" id="passages"></ol>
+        <h3 class="step">2 · Laya's typed question <span class="meta" id="judgeMeta"></span></h3>
+        <div id="probs"></div>
+        <details><summary>Exact question and state sent to the model</summary><pre id="qjson"></pre></details>
+        <h3 class="step" id="docHead">3 · Source document <span class="meta">retrieved passages highlighted<span id="evNote"></span></span></h3>
+        <div class="docview" id="docview"></div>
+      </div>
+    </section>
+    <section class="card">
+      <h2>How it works</h2>
+      <p class="hint" style="font-size:13.5px">Every document is split into short passages and embedded with <b>all-MiniLM-L6-v2</b>; the vectors live in this browser's <b>IndexedDB</b>. The claim is embedded the same way and a brute-force cosine scan returns the top-k passages. The claim and those passages become the <i>state</i> of one <b>typed question</b> for the Laya decision model, which returns a probability for each option instead of generated text. That probability drives the verdict, and its confidence decides whether the verdict is acted on or held for a person. All of it runs in this tab: no server, no API key.</p>
+      <p class="hint">The <a href="./rag-eval.html">Evaluate</a> page runs the same pipeline over all 72 sample claims and scores it against the gold labels.</p>
+    </section>
+  </main>
+</div>
+
+<footer class="foot">
+  Laya RAG Judge · Apache-2.0 · Judge: <a href="https://huggingface.co/VishalMysore/layaForWebTrained" target="_blank" rel="noopener">Laya typed-decisions (browser build)</a>, derived from <a href="https://huggingface.co/convaiinnovations/laya-typed-decisions" target="_blank" rel="noopener">ConvAI Innovations' Laya</a>. Retriever: <a href="https://huggingface.co/Xenova/all-MiniLM-L6-v2" target="_blank" rel="noopener">all-MiniLM-L6-v2</a>. The sample documents are fictional and written for this demo. <a href="./NOTICE.txt">Notices</a>.
+</footer>
+<script type="module" src="./verify.js"></script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+{
+  "name": "Laya RAG Judge sample v1",
+  "license": "Apache-2.0 (written for this demo)",
+  "description": "A hand-labeled claim-verification sample written for this demo. Every document describes a fictional place, organisation, person or policy, so a claim's gold label depends only on its evidence document, never on world knowledge. Supported claims paraphrase or follow directly from the document; unsupported claims change a number or entity, contradict the document, or add something it does not say. The three datasets mimic the genres in grounded-factuality benchmarks such as LLM-AggreFact (encyclopedic, news, and policy/documentation text), but no benchmark text is included.",
+  "datasets": {
+    "encyclopedic": "Wikipedia-style articles",
+    "news": "Short news reports",
+    "policy": "Policies, terms and product documentation"
+  },
+  "kinds": {
+    "paraphrase": "Supported: restates the document in other words",
+    "inference": "Supported: follows from the document with a small step (arithmetic, combining two facts)",
+    "number": "Not supported: a number, date or quantity is changed",
+    "entity": "Not supported: a name, place or type is swapped",
+    "contradiction": "Not supported: the document says the opposite",
+    "unverifiable": "Not supported: plausible, but the document does not say it"
+  },
+  "documents": {
+    "enc-lighthouse": {
+      "dataset": "encyclopedic", "title": "Varnholt Lighthouse",
+      "text": "Varnholt Lighthouse stands on a granite headland at the northern tip of Kessel Island. It was designed by the engineer Mathilde Orsk and first lit in 1868. The tower is 34 metres tall and is built from locally quarried granite blocks. Its original lens was a first-order Fresnel lens made in Paris. In 1931 the oil lamp was replaced with an electric light, which could be seen from 22 nautical miles away. The last resident keeper, Anton Brevik, left the station in 1987, when the light was fully automated. Since then the keeper's cottage has been run as a small museum by the Kessel Heritage Society. The museum is open from May to September and displays the original lens, which was removed during a restoration in 2004. A replacement LED beacon now operates from the lantern room. Visitors can climb the 152 steps of the spiral staircase to the gallery on weekends."
+    },
+    "enc-railway": {
+      "dataset": "encyclopedic", "title": "Sorrel Valley Railway",
+      "text": "The Sorrel Valley Railway is a narrow-gauge heritage railway that runs 14 kilometres between the market town of Aldmere and the village of Fenwick Cross. The line opened in 1897 to carry slate from the Fenwick quarries down to the canal wharf at Aldmere. Passenger services were added in 1903 after local residents petitioned the company. The quarries closed in 1949, and the railway lost most of its traffic. It was shut down by its owners in 1952 and the track was lifted two years later. In 1971 a group of volunteers formed the Sorrel Valley Railway Trust with the aim of rebuilding the line. The first rebuilt section, from Aldmere to Brook Halt, reopened in 1980. The full route to Fenwick Cross was restored in 1998. Today the trust operates three steam locomotives, the oldest of which was built in 1895 for a quarry in Wales. Trains run daily in August and at weekends for the rest of the year."
+    },
+    "enc-castellan": {
+      "dataset": "encyclopedic", "title": "Helena Castellan",
+      "text": "Helena Castellan (1921-2004) was a marine chemist known for her work on ocean acidification. She was born in Valparaiso and studied chemistry at the University of Edinburgh, graduating in 1944. After the war she joined the Plymouth Marine Station, where she spent most of her career. In 1962 she published the first long-term measurements of carbonate chemistry in the English Channel, based on samples she had collected every month for nine years. Her data later became a baseline for studies of how seawater absorbs carbon dioxide. Castellan was elected a Fellow of the Royal Society in 1975. She never held a university professorship, preferring to remain at the marine station. In retirement she wrote a popular book, The Restless Sea, published in 1989. A research vessel operated by the station was named after her in 2010."
+    },
+    "enc-bridge": {
+      "dataset": "encyclopedic", "title": "Mirelle Bridge",
+      "text": "The Mirelle Bridge carries a four-lane road across the River Oste at the city of Dunmark. It is a cable-stayed bridge with a main span of 410 metres, supported by two concrete pylons that rise 96 metres above the water. Construction began in 2009 and the bridge opened to traffic in June 2013, replacing a ferry service that had operated at the site since the 1850s. The project cost 380 million euros, about 15 percent more than the original budget, mainly because of delays in building the foundations in soft river clay. A separate cycle and footpath runs along the eastern side of the deck. Tolls were charged for the first ten years to repay construction loans and were abolished in July 2023. Around 31,000 vehicles cross the bridge on an average weekday."
+    },
+    "enc-cheese": {
+      "dataset": "encyclopedic", "title": "Orvik cheese",
+      "text": "Orvik is a semi-hard cheese made from raw sheep's milk in the upland valleys of the Tessane region. It is produced only between April and October, when the flocks graze on mountain pastures. The curd is pressed into wheels weighing about 4 kilograms and rubbed with salt and crushed juniper berries. Wheels are aged for at least five months in limestone caves, where natural moulds give the rind its grey colour. Since 2011 the name Orvik has been protected, and only cheese from 23 registered farms may be sold under it. Annual production is roughly 90 tonnes, most of which is sold within the region. The cheese is traditionally served with honey and walnuts at the end of a meal."
+    },
+    "enc-lake": {
+      "dataset": "encyclopedic", "title": "Lake Imber",
+      "text": "Lake Imber is a glacial lake in the Hallin Mountains, lying at an altitude of 1,240 metres. It covers about 6.5 square kilometres and reaches a maximum depth of 118 metres, making it the deepest lake in the range. The lake is fed mainly by meltwater from the Imber Glacier, which has retreated by more than two kilometres since measurements began in 1920. Because of the cold water, the lake freezes over from December until early May. Its only outflow is the Selle River, which drops over the Imber Falls shortly after leaving the lake. A population of Arctic char lives in the lake and is thought to have been isolated there since the end of the last ice age. Fishing is permitted only from boats and only between June and September. The nearest road ends nine kilometres away, so visitors must reach the lake on foot."
+    },
+    "news-bikelanes": {
+      "dataset": "news", "title": "Council approves protected bike lanes",
+      "text": "The Harlow Bay city council voted 7 to 2 on Tuesday to approve a network of protected bike lanes along four of the city's busiest streets. The plan will add 18 kilometres of lanes separated from traffic by concrete kerbs. Work is expected to start in March and finish by the end of next year. The project will cost 12.4 million dollars, of which 8 million will come from a state transport grant awarded in the spring. Councillor Dana Whitfield, who proposed the plan, said cycling injuries in the city had risen for three years in a row. The two councillors who voted against it argued that removing 340 parking spaces would hurt shops on Mercer Street. The council agreed to review the effect on local businesses one year after the lanes open."
+    },
+    "news-earnings": {
+      "dataset": "news", "title": "Brightwater Foods quarterly results",
+      "text": "Brightwater Foods reported a net profit of 46 million dollars for the third quarter, down from 58 million a year earlier. Revenue rose 4 percent to 1.1 billion dollars, helped by higher prices for its frozen meals. The company said rising costs for packaging and transport had squeezed its margins. Chief executive Marcus Ohene told analysts that the company would close its oldest factory, in Lindale, by the middle of next year and move production to a newer plant in Crestfield. About 220 jobs will be affected, though the company said it would offer transfers to most workers. Brightwater also cut its full-year profit forecast. Its shares fell 6 percent in early trading after the announcement."
+    },
+    "news-storm": {
+      "dataset": "news", "title": "Storm Elin hits the west coast",
+      "text": "Storm Elin brought wind gusts of up to 140 kilometres per hour to the western coast overnight, cutting power to around 60,000 homes. The national weather service had issued a red warning for coastal districts on Sunday afternoon. Two ferry routes to the outer islands were cancelled, and the main coastal highway was closed for several hours after trees fell across it near Morland. No deaths were reported, but three people were treated in hospital for minor injuries. By Monday evening the power company said supply had been restored to all but 4,000 homes. Forecasters expect calmer weather for the rest of the week, although heavy rain may cause local flooding on Wednesday."
+    },
+    "news-sleep": {
+      "dataset": "news", "title": "Later school start linked to more sleep",
+      "text": "A study of 2,400 secondary school students in the Norrland district found that those who started school at 9:00 instead of 8:00 slept an average of 34 minutes more per night. The researchers, from the University of Kallberg, compared ten schools that moved to a later start in 2022 with ten that did not. Students at the later-starting schools also reported feeling less sleepy during morning lessons. However, the study found no clear difference in exam results between the two groups after one year. The lead author, Dr. Sofia Lindqvist, said a longer study would be needed to see whether grades improve over time. The findings were published in the Journal of Adolescent Health Research."
+    },
+    "news-cup": {
+      "dataset": "news", "title": "Riverside United win the regional cup",
+      "text": "Riverside United won the regional cup final on Saturday, beating Eastgate Rovers 3-1 in front of 18,500 fans at Carrow Park. Eastgate took the lead after 12 minutes through a header from Leon Mbeki. Riverside equalised just before half-time when Tomasz Wrona scored from a free kick. Substitute Kai Osei scored twice in the second half to seal the win. It is Riverside's first cup title since 1994. Eastgate finished the match with ten players after their captain, Joel Hart, was sent off for a second yellow card in the 71st minute."
+    },
+    "news-clinics": {
+      "dataset": "news", "title": "Three walk-in clinics to open",
+      "text": "The regional health authority will open three new walk-in clinics in the towns of Ashby, Pell and Northcote from next month, in an effort to reduce waiting times at hospital emergency departments. The clinics will treat minor injuries and illnesses and will be open from 8 am to 10 pm every day, including weekends. Each clinic will be staffed by nurses and at least one doctor. The authority said about a third of patients who currently visit emergency departments could be treated at a walk-in clinic instead. The clinics will cost 5.2 million a year to run. Patients will not need an appointment, but those with serious conditions such as chest pain will still be told to go to hospital."
+    },
+    "pol-returns": {
+      "dataset": "policy", "title": "Lumen Home returns policy",
+      "text": "Items bought from Lumen Home can be returned within 30 days of delivery for a full refund, provided they are unused and in their original packaging. Sale items marked final sale cannot be returned. Mattresses may be returned within 100 nights of delivery, even if they have been used, but a 50 dollar collection fee applies. To start a return, customers must request a return label from their online account. Return shipping is free for orders over 75 dollars; for smaller orders the cost of the label is deducted from the refund. Refunds are paid to the original payment method within 7 business days of the item reaching our warehouse. Gift cards cannot be refunded or exchanged for cash."
+    },
+    "pol-leave": {
+      "dataset": "policy", "title": "Annual leave policy",
+      "text": "Full-time employees receive 25 days of paid annual leave each calendar year, in addition to public holidays. Part-time employees receive leave in proportion to the hours they work. Up to five unused days may be carried over into the next year, but they must be taken by the end of March or they will be lost. Leave requests of more than ten consecutive working days need approval from a department head at least eight weeks in advance. New employees start earning leave from their first day but cannot take more than five days during their six-month probation period. Employees who leave the company are paid for any leave they have earned but not taken."
+    },
+    "pol-api": {
+      "dataset": "policy", "title": "Parcelly API rate limits",
+      "text": "The Parcelly API allows up to 600 requests per minute per API key on the Standard plan and 3,000 requests per minute on the Enterprise plan. Requests that exceed the limit receive an HTTP 429 response with a Retry-After header indicating how many seconds to wait. Rate limits are applied separately to each key, so an account with several keys can make more requests in total. Webhook deliveries do not count towards the limit. Tracking requests for a single parcel are cached for 60 seconds, and repeated requests within that window return the cached result without counting against the limit. Enterprise customers can ask their account manager for a temporary increase during peak seasons."
+    },
+    "pol-library": {
+      "dataset": "policy", "title": "Carden County Library membership rules",
+      "text": "Anyone who lives, works or studies in Carden County can join the county library for free. Members can borrow up to 15 items at a time. Books may be kept for three weeks and can be renewed twice, online or by phone, unless another member has reserved them. DVDs are lent for one week and cannot be renewed. The library no longer charges fines for late returns on children's books, but adult items incur a fee of 20 cents per day, up to a maximum of 5 dollars per item. Items not returned after 60 days are treated as lost, and the member is charged the replacement cost. Members aged under 12 need a parent or guardian to sign their application."
+    },
+    "pol-insurance": {
+      "dataset": "policy", "title": "Voyager Basic travel insurance",
+      "text": "The Voyager Basic travel insurance policy covers emergency medical expenses of up to 2 million dollars during a trip abroad. Trip cancellation is covered up to 5,000 dollars if the traveller cannot go because of illness, injury, or the death of a close relative. Cancellations because the traveller simply changes their mind are not covered. Lost or delayed baggage is covered up to 1,500 dollars, with a limit of 300 dollars for any single item. The policy does not cover injuries from skiing, scuba diving or other winter and extreme sports unless the optional Adventure Pack is added. Pre-existing medical conditions must be declared before purchase and may be excluded from cover."
+    },
+    "pol-house": {
+      "dataset": "policy", "title": "Linden Court house rules",
+      "text": "Residents of Linden Court must keep noise to a minimum between 10 pm and 7 am. Bicycles must be stored in the basement bike room and may not be left in hallways or stairwells. Small pets such as cats and dogs under 15 kilograms are allowed, but residents must register them with the building office. Barbecues are permitted on ground-floor patios only, and must use gas rather than charcoal. The rooftop terrace is open to all residents from 8 am to 9 pm between April and October. Rubbish must be sorted into general waste, paper, glass and food waste in the courtyard bins, which are emptied every Tuesday and Friday."
+    }
+  },
+  "claims": [
+    { "id": "enc-lighthouse-1", "docId": "enc-lighthouse", "claim": "The lighthouse was first lit in 1868 to a design by Mathilde Orsk.", "label": "supported", "kind": "paraphrase", "evidence": "designed by the engineer Mathilde Orsk and first lit in 1868" },
+    { "id": "enc-lighthouse-2", "docId": "enc-lighthouse", "claim": "The light has been operated without a resident keeper since 1987.", "label": "supported", "kind": "inference", "evidence": "left the station in 1987, when the light was fully automated" },
+    { "id": "enc-lighthouse-3", "docId": "enc-lighthouse", "claim": "The electric light installed in 1931 could be seen from 32 nautical miles away.", "label": "not_supported", "kind": "number", "evidence": "could be seen from 22 nautical miles away" },
+    { "id": "enc-lighthouse-4", "docId": "enc-lighthouse", "claim": "The original Fresnel lens still shines from the lantern room today.", "label": "not_supported", "kind": "contradiction", "evidence": "A replacement LED beacon now operates from the lantern room" },
+
+    { "id": "enc-railway-1", "docId": "enc-railway", "claim": "The railway was originally built to transport slate to a canal wharf.", "label": "supported", "kind": "paraphrase", "evidence": "to carry slate from the Fenwick quarries down to the canal wharf at Aldmere" },
+    { "id": "enc-railway-2", "docId": "enc-railway", "claim": "Volunteers restored the complete route to Fenwick Cross in 1998.", "label": "supported", "kind": "paraphrase", "evidence": "The full route to Fenwick Cross was restored in 1998" },
+    { "id": "enc-railway-3", "docId": "enc-railway", "claim": "Passenger trains have run on the line since it opened in 1897.", "label": "not_supported", "kind": "contradiction", "evidence": "Passenger services were added in 1903" },
+    { "id": "enc-railway-4", "docId": "enc-railway", "claim": "The railway was shut down in 1952 because a flood destroyed the track.", "label": "not_supported", "kind": "unverifiable", "evidence": null },
+
+    { "id": "enc-castellan-1", "docId": "enc-castellan", "claim": "Castellan collected seawater samples every month for nine years for her 1962 measurements.", "label": "supported", "kind": "paraphrase", "evidence": "based on samples she had collected every month for nine years" },
+    { "id": "enc-castellan-2", "docId": "enc-castellan", "claim": "A research ship was named after Castellan six years after her death.", "label": "supported", "kind": "inference", "evidence": "A research vessel operated by the station was named after her in 2010" },
+    { "id": "enc-castellan-3", "docId": "enc-castellan", "claim": "Castellan was a professor of chemistry at the University of Edinburgh.", "label": "not_supported", "kind": "contradiction", "evidence": "She never held a university professorship" },
+    { "id": "enc-castellan-4", "docId": "enc-castellan", "claim": "Castellan's book The Restless Sea won a national prize for science writing.", "label": "not_supported", "kind": "unverifiable", "evidence": null },
+
+    { "id": "enc-bridge-1", "docId": "enc-bridge", "claim": "The bridge replaced a ferry that had run at the same crossing for more than 150 years.", "label": "supported", "kind": "inference", "evidence": "replacing a ferry service that had operated at the site since the 1850s" },
+    { "id": "enc-bridge-2", "docId": "enc-bridge", "claim": "The cost overrun was mainly caused by delays with the foundations in soft clay.", "label": "supported", "kind": "paraphrase", "evidence": "mainly because of delays in building the foundations in soft river clay" },
+    { "id": "enc-bridge-3", "docId": "enc-bridge", "claim": "The Mirelle Bridge is a suspension bridge with a main span of 410 metres.", "label": "not_supported", "kind": "entity", "evidence": "It is a cable-stayed bridge with a main span of 410 metres" },
+    { "id": "enc-bridge-4", "docId": "enc-bridge", "claim": "Drivers still have to pay a toll to cross the Mirelle Bridge.", "label": "not_supported", "kind": "contradiction", "evidence": "were abolished in July 2023" },
+
+    { "id": "enc-cheese-1", "docId": "enc-cheese", "claim": "Orvik has to be aged for a minimum of five months.", "label": "supported", "kind": "paraphrase", "evidence": "Wheels are aged for at least five months in limestone caves" },
+    { "id": "enc-cheese-2", "docId": "enc-cheese", "claim": "Only registered farms may sell their cheese under the Orvik name.", "label": "supported", "kind": "paraphrase", "evidence": "only cheese from 23 registered farms may be sold under it" },
+    { "id": "enc-cheese-3", "docId": "enc-cheese", "claim": "Orvik is made from pasteurised cow's milk.", "label": "not_supported", "kind": "entity", "evidence": "made from raw sheep's milk" },
+    { "id": "enc-cheese-4", "docId": "enc-cheese", "claim": "Most Orvik cheese is exported to other countries.", "label": "not_supported", "kind": "contradiction", "evidence": "most of which is sold within the region" },
+
+    { "id": "enc-lake-1", "docId": "enc-lake", "claim": "The Imber Glacier has retreated by more than two kilometres since 1920.", "label": "supported", "kind": "paraphrase", "evidence": "has retreated by more than two kilometres since measurements began in 1920" },
+    { "id": "enc-lake-2", "docId": "enc-lake", "claim": "Visitors cannot drive all the way to Lake Imber.", "label": "supported", "kind": "inference", "evidence": "The nearest road ends nine kilometres away" },
+    { "id": "enc-lake-3", "docId": "enc-lake", "claim": "Lake Imber has the largest surface area of any lake in the Hallin Mountains.", "label": "not_supported", "kind": "unverifiable", "evidence": null },
+    { "id": "enc-lake-4", "docId": "enc-lake", "claim": "Anglers are allowed to fish from the shore of Lake Imber in summer.", "label": "not_supported", "kind": "contradiction", "evidence": "Fishing is permitted only from boats" },
+
+    { "id": "news-bikelanes-1", "docId": "news-bikelanes", "claim": "Most of the money for the bike lanes will come from a state grant.", "label": "supported", "kind": "inference", "evidence": "of which 8 million will come from a state transport grant" },
+    { "id": "news-bikelanes-2", "docId": "news-bikelanes", "claim": "The councillors who opposed the plan were worried that losing parking would hurt shops.", "label": "supported", "kind": "paraphrase", "evidence": "argued that removing 340 parking spaces would hurt shops on Mercer Street" },
+    { "id": "news-bikelanes-3", "docId": "news-bikelanes", "claim": "The council approved the bike lane plan unanimously.", "label": "not_supported", "kind": "contradiction", "evidence": "voted 7 to 2 on Tuesday" },
+    { "id": "news-bikelanes-4", "docId": "news-bikelanes", "claim": "Construction of the new bike lanes has already been finished.", "label": "not_supported", "kind": "contradiction", "evidence": "Work is expected to start in March" },
+
+    { "id": "news-earnings-1", "docId": "news-earnings", "claim": "Brightwater's quarterly profit fell from a year earlier even though its revenue grew.", "label": "supported", "kind": "inference", "evidence": "down from 58 million a year earlier" },
+    { "id": "news-earnings-2", "docId": "news-earnings", "claim": "Brightwater plans to move production from Lindale to Crestfield.", "label": "supported", "kind": "paraphrase", "evidence": "move production to a newer plant in Crestfield" },
+    { "id": "news-earnings-3", "docId": "news-earnings", "claim": "Brightwater raised its profit forecast for the full year.", "label": "not_supported", "kind": "contradiction", "evidence": "Brightwater also cut its full-year profit forecast" },
+    { "id": "news-earnings-4", "docId": "news-earnings", "claim": "The closure of the Lindale factory will affect about 420 jobs.", "label": "not_supported", "kind": "number", "evidence": "About 220 jobs will be affected" },
+
+    { "id": "news-storm-1", "docId": "news-storm", "claim": "By Monday evening, power had been restored to most of the homes that lost it.", "label": "supported", "kind": "inference", "evidence": "supply had been restored to all but 4,000 homes" },
+    { "id": "news-storm-2", "docId": "news-storm", "claim": "Nobody was reported killed in the storm.", "label": "supported", "kind": "paraphrase", "evidence": "No deaths were reported" },
+    { "id": "news-storm-3", "docId": "news-storm", "claim": "All ferries to the outer islands ran normally during the storm.", "label": "not_supported", "kind": "contradiction", "evidence": "Two ferry routes to the outer islands were cancelled" },
+    { "id": "news-storm-4", "docId": "news-storm", "claim": "Storm Elin caused an estimated 30 million dollars of damage.", "label": "not_supported", "kind": "unverifiable", "evidence": null },
+
+    { "id": "news-sleep-1", "docId": "news-sleep", "claim": "Students at schools that started later slept about half an hour more each night.", "label": "supported", "kind": "paraphrase", "evidence": "slept an average of 34 minutes more per night" },
+    { "id": "news-sleep-2", "docId": "news-sleep", "claim": "After one year the study found no clear improvement in exam results.", "label": "supported", "kind": "paraphrase", "evidence": "the study found no clear difference in exam results" },
+    { "id": "news-sleep-3", "docId": "news-sleep", "claim": "The study showed that a later start time improved students' exam grades.", "label": "not_supported", "kind": "contradiction", "evidence": "the study found no clear difference in exam results" },
+    { "id": "news-sleep-4", "docId": "news-sleep", "claim": "The study compared students in twenty different school districts.", "label": "not_supported", "kind": "entity", "evidence": "compared ten schools that moved to a later start in 2022 with ten that did not" },
+
+    { "id": "news-cup-1", "docId": "news-cup", "claim": "Riverside United came from behind to win the final.", "label": "supported", "kind": "inference", "evidence": "Eastgate took the lead after 12 minutes" },
+    { "id": "news-cup-2", "docId": "news-cup", "claim": "Kai Osei came off the bench and scored two goals.", "label": "supported", "kind": "paraphrase", "evidence": "Substitute Kai Osei scored twice in the second half" },
+    { "id": "news-cup-3", "docId": "news-cup", "claim": "Eastgate Rovers won the regional cup final.", "label": "not_supported", "kind": "contradiction", "evidence": "beating Eastgate Rovers 3-1" },
+    { "id": "news-cup-4", "docId": "news-cup", "claim": "Leon Mbeki was sent off in the 71st minute.", "label": "not_supported", "kind": "entity", "evidence": "Joel Hart, was sent off for a second yellow card in the 71st minute" },
+
+    { "id": "news-clinics-1", "docId": "news-clinics", "claim": "The new clinics will be open seven days a week.", "label": "supported", "kind": "inference", "evidence": "open from 8 am to 10 pm every day, including weekends" },
+    { "id": "news-clinics-2", "docId": "news-clinics", "claim": "Patients can be seen at the clinics without booking an appointment.", "label": "supported", "kind": "paraphrase", "evidence": "Patients will not need an appointment" },
+    { "id": "news-clinics-3", "docId": "news-clinics", "claim": "The walk-in clinics will be open 24 hours a day.", "label": "not_supported", "kind": "contradiction", "evidence": "open from 8 am to 10 pm every day" },
+    { "id": "news-clinics-4", "docId": "news-clinics", "claim": "The walk-in clinics are meant for patients with chest pain.", "label": "not_supported", "kind": "contradiction", "evidence": "those with serious conditions such as chest pain will still be told to go to hospital" },
+
+    { "id": "pol-returns-1", "docId": "pol-returns", "claim": "A mattress can be returned within 100 nights even if it has been used, for a collection fee.", "label": "supported", "kind": "paraphrase", "evidence": "Mattresses may be returned within 100 nights of delivery, even if they have been used" },
+    { "id": "pol-returns-2", "docId": "pol-returns", "claim": "For orders under 75 dollars, the customer pays for the return label.", "label": "supported", "kind": "inference", "evidence": "for smaller orders the cost of the label is deducted from the refund" },
+    { "id": "pol-returns-3", "docId": "pol-returns", "claim": "Final sale items can be returned within 30 days.", "label": "not_supported", "kind": "contradiction", "evidence": "Sale items marked final sale cannot be returned" },
+    { "id": "pol-returns-4", "docId": "pol-returns", "claim": "Refunds are issued as store credit.", "label": "not_supported", "kind": "contradiction", "evidence": "Refunds are paid to the original payment method" },
+
+    { "id": "pol-leave-1", "docId": "pol-leave", "claim": "Leave carried over from last year is lost if it is not taken by the end of March.", "label": "supported", "kind": "paraphrase", "evidence": "they must be taken by the end of March or they will be lost" },
+    { "id": "pol-leave-2", "docId": "pol-leave", "claim": "Employees who leave are paid for earned leave they did not take.", "label": "supported", "kind": "paraphrase", "evidence": "Employees who leave the company are paid for any leave they have earned but not taken" },
+    { "id": "pol-leave-3", "docId": "pol-leave", "claim": "Employees may carry up to ten unused days over into the next year.", "label": "not_supported", "kind": "number", "evidence": "Up to five unused days may be carried over" },
+    { "id": "pol-leave-4", "docId": "pol-leave", "claim": "New employees do not earn any leave until their probation period ends.", "label": "not_supported", "kind": "contradiction", "evidence": "New employees start earning leave from their first day" },
+
+    { "id": "pol-api-1", "docId": "pol-api", "claim": "Going over the rate limit returns an HTTP 429 error that says how long to wait.", "label": "supported", "kind": "paraphrase", "evidence": "receive an HTTP 429 response with a Retry-After header" },
+    { "id": "pol-api-2", "docId": "pol-api", "claim": "Webhook deliveries are not counted against the rate limit.", "label": "supported", "kind": "paraphrase", "evidence": "Webhook deliveries do not count towards the limit" },
+    { "id": "pol-api-3", "docId": "pol-api", "claim": "The Standard plan allows 3,000 requests per minute per key.", "label": "not_supported", "kind": "number", "evidence": "up to 600 requests per minute per API key on the Standard plan" },
+    { "id": "pol-api-4", "docId": "pol-api", "claim": "All API keys on an account share a single rate limit.", "label": "not_supported", "kind": "contradiction", "evidence": "Rate limits are applied separately to each key" },
+
+    { "id": "pol-library-1", "docId": "pol-library", "claim": "The library does not charge late fines on children's books.", "label": "supported", "kind": "paraphrase", "evidence": "no longer charges fines for late returns on children's books" },
+    { "id": "pol-library-2", "docId": "pol-library", "claim": "Late fines on an adult item can never exceed 5 dollars.", "label": "supported", "kind": "paraphrase", "evidence": "up to a maximum of 5 dollars per item" },
+    { "id": "pol-library-3", "docId": "pol-library", "claim": "DVDs can be renewed once online.", "label": "not_supported", "kind": "contradiction", "evidence": "DVDs are lent for one week and cannot be renewed" },
+    { "id": "pol-library-4", "docId": "pol-library", "claim": "People who live outside Carden County can join for 10 dollars a year.", "label": "not_supported", "kind": "unverifiable", "evidence": null },
+
+    { "id": "pol-insurance-1", "docId": "pol-insurance", "claim": "Skiing injuries are covered only if the Adventure Pack is added.", "label": "supported", "kind": "paraphrase", "evidence": "unless the optional Adventure Pack is added" },
+    { "id": "pol-insurance-2", "docId": "pol-insurance", "claim": "The most the policy pays for any one lost item is 300 dollars.", "label": "supported", "kind": "paraphrase", "evidence": "with a limit of 300 dollars for any single item" },
+    { "id": "pol-insurance-3", "docId": "pol-insurance", "claim": "Travellers can claim for cancellation if they simply change their mind about the trip.", "label": "not_supported", "kind": "contradiction", "evidence": "Cancellations because the traveller simply changes their mind are not covered" },
+    { "id": "pol-insurance-4", "docId": "pol-insurance", "claim": "Emergency medical expenses are covered up to 5 million dollars.", "label": "not_supported", "kind": "number", "evidence": "covers emergency medical expenses of up to 2 million dollars" },
+
+    { "id": "pol-house-1", "docId": "pol-house", "claim": "Residents who keep a cat must register it with the building office.", "label": "supported", "kind": "paraphrase", "evidence": "residents must register them with the building office" },
+    { "id": "pol-house-2", "docId": "pol-house", "claim": "Charcoal barbecues are not allowed at Linden Court.", "label": "supported", "kind": "paraphrase", "evidence": "must use gas rather than charcoal" },
+    { "id": "pol-house-3", "docId": "pol-house", "claim": "Residents can use the rooftop terrace all year round.", "label": "not_supported", "kind": "contradiction", "evidence": "between April and October" },
+    { "id": "pol-house-4", "docId": "pol-house", "claim": "Bicycles may be left in hallways as long as they do not block the stairs.", "label": "not_supported", "kind": "contradiction", "evidence": "may not be left in hallways or stairwells" }
+  ]
+}

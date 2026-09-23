@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG Judge Evaluation</title>
+<meta name="description" content="Runs the browser-native RAG claim-verification pipeline over a labeled sample and scores Laya's judgments against the gold labels: accuracy, false-verification rate, confidence vs coverage, latency.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f766e'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="./coi.js"></script>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect width="32" height="32" rx="7" class="logo-bg"/><path d="M9 16.5l4.5 4.5L23 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <h1>Laya RAG Judge</h1>
+      <p>Scoring the judge against gold labels, in your browser</p>
+    </div>
+  </div>
+  <div class="topright">
+    <nav class="nav" aria-label="Pages"><a href="./index.html">Verify a claim</a><a href="./rag-eval.html" aria-current="page">Evaluate</a></nav>
+    <div class="modelpill" id="modelPill" role="status"><span class="dot"></span><span id="modelPillText">Models not loaded</span></div>
+  </div>
+</header>
+
+<section class="card modelcard" id="modelCard">
+  <div class="modelrow">
+    <div class="field">
+      <label for="variant">Judge model build (Laya)</label>
+      <select id="variant"><option>Reading manifest…</option></select>
+    </div>
+    <div class="field">
+      <label for="backend">Backend</label>
+      <select id="backend">
+        <option value="auto">Auto (WebGPU for int4, else WASM)</option>
+        <option value="wasm">WASM (CPU)</option>
+        <option value="webgpu">WebGPU (int4 build only)</option>
+      </select>
+    </div>
+    <button id="loadBtn" class="primary" disabled>Load models</button>
+  </div>
+  <div class="progress" id="progress" hidden><div id="progressBar"></div></div>
+  <p class="status" id="status">Judge: <a id="modelLink" target="_blank" rel="noopener"></a>. Retriever: <a id="embedLink" target="_blank" rel="noopener"></a><span id="embedState"></span>. Until they're loaded, this page shows evaluation runs recorded from the same models.</p>
+  <div class="badges" id="badges"></div>
+</section>
+
+<div class="layout">
+  <aside class="side">
+    <section class="card">
+      <h2>Run an evaluation</h2>
+      <div class="field">
+        <label for="preset">Judge question</label>
+        <select id="preset"></select>
+      </div>
+      <div class="row3">
+        <div class="field"><label for="spc">Sentences / chunk</label><select id="spc"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+        <div class="field"><label for="k">Top-k</label><select id="k"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+        <div class="field"><label for="scope">Search in</label><select id="scope"><option value="document">Claim's document</option><option value="corpus">Whole corpus</option></select></div>
+      </div>
+      <div class="field">
+        <label for="subset">Sample</label>
+        <select id="subset"><option value="all">All claims</option><option value="1">1 supported + 1 unsupported per document</option><option value="quick">Quick check: 12 claims</option></select>
+      </div>
+      <div class="btnrow">
+        <button id="runBtn" class="primary">Run evaluation</button>
+        <button id="stopBtn" disabled>Stop</button>
+      </div>
+      <div class="runbar" style="margin-top:10px">
+        <div class="progress" id="evalProgress"><div id="evalBar" style="height:100%;width:0;background:var(--accent);transition:width .2s"></div></div>
+        <span class="count" id="evalCount">–</span>
+      </div>
+      <p class="hint" id="runHint"></p>
+    </section>
+
+    <section class="card">
+      <h2>Decision settings</h2>
+      <div class="field">
+        <label for="cutoff">Say "supported" when p(supported) ≥ <b id="cutoffVal">0.50</b></label>
+        <input type="range" id="cutoff" min="0.05" max="0.95" step="0.01" value="0.5">
+        <p class="hint" id="bestHint"></p>
+      </div>
+      <div class="field">
+        <label for="thresh">Confidence needed to act automatically: <b id="threshVal">0.10</b></label>
+        <input type="range" id="thresh" min="0" max="0.6" step="0.01" value="0.1">
+        <p class="hint">Both sliders re-score the stored run instantly; the model is not called again.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Stored runs</h2>
+      <div class="runsel"><select id="runSel" aria-label="Stored runs"></select></div>
+      <div class="btnrow">
+        <button id="exportBtn">Download run (JSON)</button>
+        <button id="clearBtn" class="ghost">Clear this browser's index and runs</button>
+      </div>
+      <p class="hint">Runs are cached in IndexedDB, keyed by model build, question, chunking, k and scope. Recorded runs ship with the page.</p>
+    </section>
+  </aside>
+
+  <main class="main">
+    <section class="card" id="summaryCard">
+      <div class="toolbar"><h2 style="margin:0" id="runTitle">No run yet</h2><span class="caption" id="runMeta"></span></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="two">
+        <figure class="chart"><figcaption>p(supported) by gold label</figcaption><div id="strip"></div><p class="caption">Each dot is one claim. A good judge puts green dots right of the cutoff line and red dots left of it.</p></figure>
+        <figure class="chart"><figcaption>Automation gate at the current settings</figcaption><div id="gates"></div></figure>
+      </div>
+    </section>
+
+    <section class="two">
+      <div class="card"><h2>Confidence vs coverage</h2><div class="tablewrap" id="coverage"></div><p class="caption">At each confidence bar: the share of claims that clear it, and how accurate the verdicts are among those.</p></div>
+      <div class="card"><h2>By dataset</h2><div class="tablewrap" id="byDataset"></div><h2 style="margin-top:14px">By claim type</h2><div class="tablewrap" id="byKind"></div></div>
+    </section>
+
+    <section class="card">
+      <div class="toolbar"><h2 style="margin:0">Every claim</h2>
+        <div class="filters">
+          <label class="check"><input type="checkbox" id="onlyWrong"> Only wrong verdicts</label>
+          <select id="fDataset" aria-label="Filter by dataset"></select>
+        </div>
+      </div>
+      <div class="tablewrap"><table class="grid" id="claims"></table></div>
+      <p class="caption">Click a row to see the retrieved passages.</p>
+    </section>
+  </main>
+</div>
+
+<footer class="foot">
+  Laya RAG Judge · Apache-2.0 · No comparison against any other model is made here: the judge is scored only against the sample's own gold labels. The sample is hand-written and small (72 claims), so treat the numbers as a smoke test, not a benchmark result. <a href="./NOTICE.txt">Notices</a>.
+</footer>
+<script type="module" src="./rag-eval.js"></script>
+</body>
+</html>
