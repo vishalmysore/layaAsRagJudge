@@ -38,10 +38,13 @@ function subsetClaims(which) {
 
 const runLabel = (r) => `${r.source === "recorded" ? "Recorded · " : ""}${r.model.variant} · ${PRESETS[r.presetId]?.name.split(":")[0] || r.presetId} · ${r.rag.sentencesPerChunk} sent/chunk · k=${r.rag.k} · ${r.rag.scope} · ${r.records.length} claims${r.complete ? "" : " (partial)"}`;
 
+// Browser runs and recorded runs can share a configuration key; list them separately so neither hides the other.
+const runId = (r) => (r.source === "recorded" ? "rec|" : "") + r.key;
+
 function fillRunSelect() {
-  const sel = $("runSel"); const cur = S.current?.key;
+  const sel = $("runSel"); const cur = S.current && runId(S.current);
   const list = [...S.runs.values()].sort((a, b) => (a.source === "recorded") - (b.source === "recorded") || String(b.createdAt).localeCompare(String(a.createdAt)));
-  sel.innerHTML = list.length ? list.map((r) => `<option value="${esc(r.key)}">${esc(runLabel(r))}</option>`).join("") : "<option value=''>No runs yet</option>";
+  sel.innerHTML = list.length ? list.map((r) => `<option value="${esc(runId(r))}">${esc(runLabel(r))}</option>`).join("") : "<option value=''>No runs yet</option>";
   if (cur && S.runs.has(cur)) sel.value = cur;
   $("exportBtn").disabled = !S.current;
 }
@@ -245,10 +248,10 @@ window.__lrj = {
   try { S.corpus = await loadCorpus(); } catch (e) { $("runHint").textContent = "Could not load the corpus: " + e.message; return; }
   $("fDataset").innerHTML = `<option value="">All datasets</option>` + Object.entries(S.corpus.datasets).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
   const recorded = expandRecorded(await loadRecorded(), S.corpus);
-  if (recorded) for (const r of Object.values(recorded.runs)) S.runs.set(r.key, { ...r, source: "recorded" });
+  if (recorded) for (const r of Object.values(recorded.runs)) S.runs.set("rec|" + r.key, { ...r, source: "recorded" });
   pillIdle(!!recorded);
   try { for (const r of await db.getAll("runs")) S.runs.set(r.key, r); } catch { /* storage blocked */ }
   const want = runKey({ modelVariant: recorded?.model.variant || "q8e8", presetId: $("preset").value, rag: rag() });
-  S.current = S.runs.get(want) || [...S.runs.values()][0] || null;
-  if (S.current) select(S.current.key); else { fillRunSelect(); render(); }
+  S.current = S.runs.get(want) || S.runs.get("rec|" + want) || [...S.runs.values()][0] || null;
+  if (S.current) select(runId(S.current)); else { fillRunSelect(); render(); }
 })();
