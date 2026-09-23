@@ -170,7 +170,8 @@ function strip(rs) {
     rs.filter((r) => r.gold === lab).forEach((r, i) => {
       const jitter = ((i * 7919) % 13 - 6) * 1.6;
       const wrong = verdictOf(r.pSupported, S.cutoff) !== r.gold;
-      s += `<circle cx="${x(r.pSupported).toFixed(1)}" cy="${(cy + jitter).toFixed(1)}" r="4" fill="${col}" fill-opacity="${wrong ? 0.35 : 0.85}" stroke="${wrong ? col : "none"}"><title>${esc(r.claim)} — p ${r.pSupported.toFixed(3)}</title></circle>`;
+      const sel = S.focus === r.id;
+      s += `<circle class="dot" data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(r.claim)}, p(supported) ${r.pSupported.toFixed(2)}${wrong ? ", wrong verdict" : ""}. Show details" cx="${x(r.pSupported).toFixed(1)}" cy="${(cy + jitter).toFixed(1)}" r="${sel ? 6 : 4.5}" fill="${col}" fill-opacity="${wrong ? 0.35 : 0.85}" stroke="${sel ? "var(--ink)" : wrong ? col : "none"}" stroke-width="${sel ? 2 : 1}"><title>${esc(r.claim)} — p ${r.pSupported.toFixed(3)} (click for details)</title></circle>`;
     });
   });
   const ay = T + 2 * rowH + 8;
@@ -187,7 +188,7 @@ function renderClaims() {
   let html = `<thead><tr><th>Claim</th><th>Gold</th><th>Type</th><th>p(supported)</th><th>Verdict</th><th>Gate</th><th class="r">ms</th></tr></thead><tbody>`;
   for (const r of rows) {
     const v = verdictOf(r.pSupported, S.cutoff), ok = v === r.gold, g = gate(r.pSupported, r.confidence, { cutoff: S.cutoff, threshold: S.threshold });
-    html += `<tr class="claimrow" data-id="${r.id}" tabindex="0" aria-expanded="${S.open.has(r.id)}"><td class="claim">${esc(r.claim)}</td><td>${r.gold === "supported" ? "supported" : "not supp."}</td><td><span class="tag">${esc(r.kind)}</span></td>
+    html += `<tr class="claimrow${S.focus === r.id ? " focus" : ""}" data-id="${r.id}" tabindex="0" aria-expanded="${S.open.has(r.id)}"><td class="claim">${esc(r.claim)}</td><td>${r.gold === "supported" ? "supported" : "not supp."}</td><td><span class="tag">${esc(r.kind)}</span></td>
       <td><span class="pbar"><i style="width:${(r.pSupported * 100).toFixed(0)}%"></i></span>${r.pSupported.toFixed(3)}</td>
       <td><span class="tag ${ok ? "ok" : "bad"}">${v === "supported" ? "supported" : "not supp."}</span></td><td><span class="tag ${g === "AUTO" ? "ok" : g === "BLOCK" ? "bad" : "warn"}">${g}</span></td><td class="r">${r.layaMs != null ? r.layaMs.toFixed(0) : "–"}</td></tr>`;
     if (S.open.has(r.id)) {
@@ -225,6 +226,19 @@ function wire() {
   slider("thresh", "threshold", "threshVal");
   $("onlyWrong").addEventListener("change", renderClaims);
   $("fDataset").addEventListener("change", renderClaims);
+  // Clicking a dot opens that claim's details in the table below and scrolls to it.
+  const openDot = (id) => {
+    const r = S.current?.records.find((x) => x.id === id); if (!r) return;
+    // clear filters that would hide the row
+    if ($("fDataset").value && $("fDataset").value !== r.dataset) $("fDataset").value = "";
+    if ($("onlyWrong").checked && verdictOf(r.pSupported, S.cutoff) === r.gold) $("onlyWrong").checked = false;
+    S.focus = id; S.open.add(id);
+    $("strip").innerHTML = strip(S.current.records); renderClaims();
+    const tr = document.querySelector(`#claims .claimrow[data-id="${CSS.escape(id)}"]`);
+    tr?.scrollIntoView({ behavior: "smooth", block: "center" }); tr?.focus({ preventScroll: true });
+  };
+  $("strip").addEventListener("click", (e) => { const d = e.target.closest(".dot"); if (d) openDot(d.dataset.id); });
+  $("strip").addEventListener("keydown", (e) => { const d = e.target.closest(".dot"); if (d && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openDot(d.dataset.id); } });
   $("claims").addEventListener("click", (e) => { const tr = e.target.closest(".claimrow"); if (!tr) return; const id = tr.dataset.id; S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderClaims(); });
   $("claims").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("claimrow")) { e.preventDefault(); e.target.click(); } });
   onModelsReady(() => { $("runHint").textContent = "Models ready. Pick settings and press Run evaluation."; });

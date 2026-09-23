@@ -246,3 +246,7 @@ table.grid tr.cur td { background: var(--accent-soft); }
 .runsel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .runsel select { width: 100%; min-width: 0; flex: 1 1 auto; text-overflow: ellipsis; }
 .strip text { font-size: 11px; }
+.strip .dot { cursor: pointer; }
+.strip .dot:hover { stroke: var(--ink); stroke-width: 1.5; }
+.strip .dot:focus-visible { outline: none; stroke: var(--accent); stroke-width: 2.5; }
+table.grid tr.claimrow.focus td { background: var(--accent-soft); }
