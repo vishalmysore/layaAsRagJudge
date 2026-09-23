@@ -1,4 +1,4 @@
-# Jev or Laya: LLM as Judge for RAG Applications — Live Demo
+# Jev vs Laya: LLM-as-a-Judge Running 100% Inside Your Browser (No API Costs)
 
 **Live demo:** https://vishalmysore.github.io/layaAsRagJudge/
 **Code:** https://github.com/vishalmysore/layaAsRagJudge
@@ -113,3 +113,9 @@ It works on a phone too, and in dark mode.
 ![The Evaluate page in dark mode at phone width](images/12-dark-mobile.png)
 
 The code is Apache-2.0: https://github.com/vishalmysore/layaAsRagJudge
+
+## Disclaimer
+
+Built on Laya by ConvAI Innovations (Apache-2.0), itself built on ModernBERT-large. This is an unofficial project and is not affiliated with ConvAI Innovations. All example messages are synthetic.
+
+Personal views only. I am not affiliated with TypeSafe or ConvAI Innovations. Jev and Laya are both new, so details may change. Jev figures marked as vendor claims are TypeSafe's own and were not independently verified here. The browser demo is an unofficial port of Laya (Apache 2.0).
