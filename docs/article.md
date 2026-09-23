@@ -3,41 +3,41 @@
 **Live demo:** https://vishalmysore.github.io/layaAsRagJudge/
 **Code:** https://github.com/vishalmysore/layaAsRagJudge
 
-A RAG application retrieves some documents, hands them to a model, and gets back an answer that *sounds* grounded. Whether it actually is grounded is a separate question, and it's the one that matters. The usual fix is "LLM-as-judge": after generation, ask a second model whether each claim in the answer is supported by the retrieved evidence.
+Every RAG system eventually runs into the same uncomfortable moment. The answer reads well, cites a document, sounds confident, and is wrong. The retriever found the right page; the generator just said something the page never said.
 
-That second model is normally a large hosted LLM, called over an API, once per claim. This demo tries something much smaller. The judge is **Laya**, a typed-decision model built on ModernBERT-large. It doesn't generate text at all; it answers a multiple-choice question with a probability for each option. The whole pipeline runs **inside a browser tab**: chunking, embedding, the vector store, retrieval and the judgment. There's no server, no API key and no per-call cost, and no claim text leaves the page.
+For the last few years the standard defence has been LLM-as-a-Judge. You take the generated answer and the retrieved evidence, hand both to a second, bigger LLM, and ask it whether the answer is supported. It works surprisingly often, and it caught on because it's so much cheaper than human review. But anyone who has run it at scale knows its quirks. Run the same evaluation twice and some verdicts flip. Swap the order of the inputs and the judge changes its mind. And the verdict it gives you, a "PASS" or a "4 out of 5", isn't a probability. You can't put a threshold on it, and you can't tell the cases it's sure about from the ones it's guessing on.
 
-The question the demo answers is simple: *can a small, local, non-generative model do the judge's job, and how well?*
+There's also something slightly absurd about the setup. Most of what a RAG judge is asked is a closed question: is this claim supported or not? We answer it by making a frontier model write paragraphs of reasoning just to arrive at a single yes or no. That's a classification problem dressed up as a conversation.
+
+## Jev: a judge that doesn't talk
+
+That's why there's so much excitement about **Jev**, the decision model TypeSafe AI released in September 2026, as a judge.
+
+Jev isn't a chat model, and it isn't a smaller LLM. It's a **System 1** model. You give it a *state*, meaning the data you want judged, and a set of *typed questions* with their allowed answers. It answers all of them in one fast pass, with no chain of reasoning and no generated text. A question can be a choice between named options, a score on a rubric, or a probabilistic yes or no. What comes back isn't prose. It's the selected answer together with a probability for every option.
+
+For a judge, that changes everything that was awkward about LLM-as-a-Judge. There's no free text to parse, and no prose in which to hallucinate. The probability is something you can act on: trust the confident verdicts, and send the uncertain ones to a person. TypeSafe says the model is trained specifically to produce useful, well-calibrated probabilities, and because it generates no output tokens, it's far faster and cheaper than asking a frontier model the same question.
+
+There's a trade-off, of course. A decision model can't tell you *why* it decided something. And Jev is a hosted service, so every verdict means a call to someone else's API.
+
+## Laya: the same idea, running in your browser
+
+Which raised the question I actually wanted to answer: does this idea work with a model I can run myself?
+
+**Laya** is an open, Apache-2.0 typed-decisions model from ConvAI Innovations, built on ModernBERT-large. It works the same way: a state goes in, typed questions go in (choice, score or yes/no), and a probability for each option comes out. It never writes a sentence. Unlike a hosted API, it's just a model file, which meant I could take it somewhere a hosted judge can't go: **inside a browser tab**.
+
+That took some work. The original checkpoint is far too large to download into a web page, so I exported it to ONNX and **quantized** it: an int8 build of 422 MB that runs on the CPU through WebAssembly, and an int4 build of 278 MB for GPUs through WebGPU. Both are published on Hugging Face as [VishalMysore/layaForWebTrained](https://huggingface.co/VishalMysore/layaForWebTrained). The browser downloads the model once, caches it, and from then on the judge runs locally, even offline.
+
+Then I built a complete RAG claim checker around it, with everything running in the page: chunking, embeddings, a vector store, retrieval and the Laya judge. There's no server, no API key and no per-call cost, and nothing you type leaves your machine.
 
 ![The Verify page: a claim, the retrieved evidence, Laya's verdict and the gate](images/01-verify-overview.png)
 
-## The pipeline
+## How the pipeline works
 
-```
-documents ─► sentence-aware chunking (2 sentences per passage)
-          ─► all-MiniLM-L6-v2 embeddings (384-d) ─► IndexedDB
-claim     ─► same embedder ─► cosine top-3 over IndexedDB
-          ─► Laya: one typed question { claim, evidence: [3 passages] }
-          ─► p(supported) ─► verdict ─► gate: AUTO / BLOCK / HOLD
-```
+Every document is split into short passages of two sentences each. A small embedding model, all-MiniLM-L6-v2 (23 MB), turns each passage into a vector and stores it in the browser's IndexedDB. When you check a claim, it's embedded the same way, and the three most similar passages are pulled back as evidence.
 
-Two models do two different jobs:
+That's retrieval, and it's only half the job. An embedding model measures whether a passage is *about* the claim; it has no way of saying "this passage is on topic, and it says the opposite." Deciding whether the evidence actually *supports* the claim is the judge's job, and that's where Laya comes in.
 
-| | Retriever | Judge |
-|---|---|---|
-| Model | all-MiniLM-L6-v2 (int8 ONNX) | Laya typed-decisions (ModernBERT-large, int8 ONNX) |
-| Size | ~23 MB | ~422 MB |
-| Job | Find passages *about* the claim | Decide whether they *support* it |
-| Output | A 384-number vector per text | A probability per option |
-| Time | ~5–10 ms per claim | ~1.5–5 s per claim on WASM |
-
-Both run on the same ONNX Runtime Web instance, streamed from Hugging Face once and then cached, so after the first visit the page works offline.
-
-The split matters because **relevant is not the same as supporting**. An embedding model, or a reranker, scores how closely a passage matches a claim's topic. It has no way to say "this passage is on topic, and it says the opposite." That's the judge's job.
-
-## Asking Laya a typed question
-
-Laya doesn't take a prompt and write a reply. It takes a question, a set of named options, and a *state* (the data to reason about). It then scores each option at a `[MASK]` token. The Verify page shows the exact token sequence the model reads:
+The claim and its three passages become Laya's state, and Laya is asked a single typed question. The demo shows the exact text the model reads:
 
 ```
 [CLS]choice question: Does the evidence support the claim?
@@ -50,87 +50,66 @@ Laya doesn't take a prompt and write a reply. It takes a question, a set of name
 [SEP]
 ```
 
-That's 196 tokens, against a context limit of 1,024. The answer comes back as a probability split, for example `supported 0.64 / not_supported 0.36`. There's no parsing of free text and no risk of the judge rambling. The options are plain text too, so you can change the question (add "partially supported", say) without retraining anything.
+Laya scores each option at its `[MASK]` token and returns a split such as *supported 0.64, not supported 0.36*. The options are plain text, so changing the question, say by adding a "partially supported" option, is an edit to a string, not a retraining job.
 
-![Live run: every passage, the question and state, and the exact decoded input Laya reads](images/09-live-contradiction.png)
+![A live run: the retrieved passages, the question and state, and the exact input Laya reads](images/09-live-contradiction.png)
 
-## The gate: act, block, or ask a person
+## Turning probabilities into decisions
 
-A verdict alone isn't enough; you also need to know when to trust it. The demo turns p(supported) into two things:
+A probability is only useful if you do something with it, so the demo puts a **gate** after the judge. If Laya is confident the claim is supported, the answer goes out automatically with its citation (AUTO). If it's confident the claim isn't supported, the answer is blocked (BLOCK). Anything too close to call is held for a person to review (HOLD). With the default settings that works out to a simple rule: above about 0.69 is AUTO, below about 0.31 is BLOCK, and everything in between waits for a human.
 
-1. **A verdict:** "supported" if p(supported) ≥ the cutoff (0.50), otherwise "not supported".
-2. **A confidence:** 1 − normalized entropy of the split. It's 0 at 50/50 and rises as the answer gets more lopsided.
+Three live runs show the gate at work.
 
-The **gate** combines them:
-
-| Gate | When | What a RAG app would do |
-|---|---|---|
-| **AUTO** | Confident "supported" | Show the answer with its citation |
-| **BLOCK** | Confident "not supported" | Withhold or regenerate the answer |
-| **HOLD** | Too close to call | Send it to a person to review |
-
-With the default confidence bar of 0.10, this works out to a simple rule: **AUTO above p ≈ 0.69, BLOCK below p ≈ 0.31, HOLD in between.**
-
-Three live runs show all three outcomes.
-
-**BLOCK, a claim the evidence never makes.** "The study shows eating more carbs helps students sleep", checked against an article about school start times. Retrieval still returns the three most similar passages, because it always returns *something*. Laya gives it 0.23 supported, confidence 0.21, so the claim is blocked. A hallucination like this would be stopped before it reached the user.
+The first claim is one the evidence never makes: *"The study shows eating more carbs helps students sleep,"* checked against an article about school start times. Retrieval still dutifully returns the three closest passages, because retrieval always returns something. Laya isn't fooled. It gives the claim 0.23, and the gate blocks it. That's a hallucination stopped before it reaches a user.
 
 ![BLOCK: the claim is about carbs, the evidence is about school start times](images/10-live-unsupported-block.png)
 
-**AUTO, your own evidence.** Paste any text, and it's chunked and embedded in memory without being stored. "The Kestrel 5 can ride 90 km per charge in eco mode" against a short product description scores 0.81 supported, confidence 0.31: AUTO.
+The second pastes in a short product description and checks *"The Kestrel 5 can ride 90 km per charge in eco mode."* The claim is right there in the text, Laya scores it 0.81, and it passes automatically.
 
 ![AUTO: a claim checked against pasted text](images/11-live-pasted-auto.png)
 
-**HOLD, and why HOLD matters.** "All API keys on an account share a single rate limit." The top passage (cosine 0.647) says limits are applied *separately to each key*, the exact opposite. Laya gets this **wrong**: 0.64 supported. The claim and passage share almost every word (rate limit, keys, account) and differ only in logic, which is exactly where this model is weakest. But 0.64 is close to a coin flip, so confidence is 0.059 and the gate says HOLD. The wrong verdict is never acted on, and the claim goes to a person.
+The third is the interesting one. The claim is *"All API keys on an account share a single rate limit,"* and the top passage says the opposite: rate limits apply *separately to each key*. Laya gets this wrong and leans towards *supported*, at 0.64. The claim and the passage share nearly every word, and they differ only in logic, which is exactly where a model like this struggles. But 0.64 is close to a coin flip, so the gate doesn't act on it; it holds the claim for review. An LLM judge that simply said "PASS" would have waved the error through. Here the wrong verdict never gets acted on, because the model's own uncertainty flags it.
 
-This is the whole point of the gate. Laya's mistakes are concentrated where it's unsure, so the gate catches most of them.
+That's the real argument for decision models as judges. They still make mistakes, but they make most of them where they're unsure, and they tell you when they're unsure.
 
-## How good is it? Scoring against an answer key
+## How good is it?
 
-The Evaluate page runs the pipeline over **72 labeled claims** and compares every verdict with its gold label (the answer key). Each claim is also tagged with the kind of test it is: a paraphrase, a small inference, a changed number, a swapped entity, a direct contradiction, or something the document simply doesn't say.
+To find out, I wrote 72 test claims over 18 short documents, spanning encyclopedia-style articles, news reports and policy text. Half the claims are supported by their document. The other half change a number, swap a name, contradict the text, or assert something it never mentions. Every document is fictional, so the right answer depends only on the evidence and never on what the model happens to know. The demo's Evaluate page runs the whole pipeline over all 72 and checks every verdict against the answer key.
 
-![Evaluate: accuracy, false-verification rate, AUROC, and every claim as a dot](images/03-eval-summary.png)
+![The Evaluate page: overall scores, and every claim plotted by Laya's probability](images/03-eval-summary.png)
 
-In the dot chart, each dot is one claim, placed by p(supported). Green claims are truly supported, red ones aren't. A perfect judge would put every green dot right of the cutoff and every red dot left of it. Faded dots are wrong verdicts, and clicking any dot opens its passages and probabilities:
+The headline: Laya gets **75%** of the claims right, and its probabilities separate true claims from false ones well above chance (an AUROC of 0.80). That's with nothing but a typed question, and no training on this task.
 
-![Clicking a dot: the API-keys claim, its evidence, and its probabilities](images/05-eval-dot-detail.png)
+Retrieval turns out not to be the problem. The passage that proves or disproves each claim was among the top three passages 99% of the time. The mistakes come from the judge, and they cluster in predictable places. Laya caught every swapped name. It's weakest on contradictions and changed numbers, where the evidence talks about the same thing but says something slightly different.
 
-Results (int8 build, WASM, 72 claims, answer key only; no other model is compared):
+Clicking any dot in the chart opens that claim, with the passages Laya saw and the probabilities it gave:
 
-| Judge question | Search scope | Accuracy | False verification | AUROC | Evidence in top 3 |
-|---|---|---|---|---|---|
-| Two options (default) | Claim's document | **75.0%** | 27.8% | **0.80** | 99% |
-| Two options | Whole corpus | 75.0% | 27.8% | 0.80 | 96% |
-| Three options | Claim's document | 72.2% | **11.1%** | 0.80 | 99% |
-| Yes / no | Claim's document | 69.4% | 19.4% | 0.74 | 99% |
+![Clicking a dot: the API-keys claim, its evidence, and Laya's probabilities](images/05-eval-dot-detail.png)
 
-*False verification* is the share of unsupported claims the judge called "supported", the hallucinations that would get through.
+The gate is where the numbers get practical. At the default setting, 44% of claims are decided automatically, and those automatic verdicts are right **84%** of the time. The rest go to a person. Raise the bar and fewer claims are automated but more of them are right; lower it and the reverse happens. Both sliders re-score the stored results instantly, so you can explore the trade-off without running the model again.
 
-![Confidence vs coverage, and where the judge struggles](images/04-eval-coverage-breakdowns.png)
+![How the confidence bar trades automation for accuracy, and where the judge struggles](images/04-eval-coverage-breakdowns.png)
 
-What the numbers say:
+The wording of the question matters too. Offering Laya three options instead of two (*supported*, *contradicted*, *not mentioned*) makes it noticeably stricter. Overall accuracy dips slightly, to 72%, but the share of false claims it lets through drops from 28% to 11%. In a RAG system, where a hallucination reaching the user is the worse mistake, that's usually the better deal.
 
-- **It works, within limits.** An AUROC of 0.80 means Laya separates supported from unsupported claims well above chance. It does this with nothing but a typed question and no task-specific fine-tuning.
-- **The gate earns its keep.** At the default bar, 44% of claims are decided automatically, and those verdicts are **84%** accurate, against 75% overall. The rest go to review.
-- **Retrieval isn't the bottleneck.** The sentence that proves or disproves the claim is in the top 3 passages for 99% of claims (96% when searching all 118 passages). The errors come from the judge.
-- **Where it fails is predictable.** Swapped names were all caught. Contradictions (68%) and changed numbers (60%) are the weak spots, and so are policy texts, whose rules are phrased as exceptions ("cannot be returned", "not covered unless…").
-- **The question wording matters.** Splitting "not supported" into *contradicted* and *not mentioned* makes Laya stricter: accuracy dips to 72%, but false verification drops from 28% to 11%. For RAG, where a hallucination getting through is the worse mistake, that's the better trade.
+![With three options, far fewer false claims get through](images/06-eval-three-options.png)
 
-![Three options: fewer hallucinations get through](images/06-eval-three-options.png)
+## What it doesn't do
 
-## Honest caveats
+Laya isn't an LLM, and neither is Jev. Both are decision models doing a job usually given to a frontier LLM, and both give up the same thing to do it: they can't explain themselves. You get a verdict and a probability, not a rationale.
 
-- **Laya isn't an LLM.** It's a 400M-parameter encoder answering typed questions. It plays the *role* of an LLM judge, and that's the point: a much smaller, local, structured model in a slot usually filled by a hosted LLM. A model trained specifically for fact-checking, such as MiniCheck or AlignScore, would probably score higher. That comparison is deliberately out of scope here.
-- **72 claims is a smoke test, not a benchmark.** The documents are fictional and written for the demo, so a claim's answer depends only on its evidence and never on what the model already knows. The labels were written by a single author, not agreed by several annotators as in LLM-AggreFact.
-- **The probabilities are compressed.** Laya rarely goes beyond about 85/15, so no claim in the sample reached a confidence of 0.5. That's why the default bar is 0.10, not the 0.90 you might expect.
-- **Latency** is 1.5–5 s per claim on 4 WASM threads. That's fine for checking an answer, but slow for checking thousands of claims in a browser. The int4 build on WebGPU is faster.
+Laya's probabilities are also compressed. It rarely goes beyond about 85/15, so the default confidence bar is set low. The demo shows exactly where it sits and why.
+
+Seventy-two hand-written claims is a smoke test, not a benchmark. A model built specifically for fact-checking would likely do better on accuracy. And at one to five seconds per claim on a laptop CPU, a browser is fine for checking answers but not for grading thousands of them.
+
+None of that changes the central result. A small, open decision model, running entirely in a browser tab, can act as a RAG judge: it catches most hallucinations, and it knows when to ask for help.
 
 ## Try it
 
-Open the [live demo](https://vishalmysore.github.io/layaAsRagJudge/). Before downloading anything, the sample claims play back results recorded from the same models. Press **Load models** (about 445 MB once, then cached) to check your own claims against the corpus or against text you paste. On the **Evaluate** page, drag the cutoff and confidence sliders to see how the gate trades automation for accuracy, without calling the model again.
+Open the [live demo](https://vishalmysore.github.io/layaAsRagJudge/). The sample claims show recorded results straight away, before anything downloads. Press **Load models** (about 445 MB, downloaded once and then cached) to check your own claims, either against the built-in documents or against any text you paste. The **Evaluate** page lets you run the full test set yourself and watch how the gate behaves as you move the sliders.
 
-It works on a phone too, and in dark mode:
+It works on a phone too, and in dark mode.
 
-![Evaluate page in dark mode at phone width](images/12-dark-mobile.png)
+![The Evaluate page in dark mode at phone width](images/12-dark-mobile.png)
 
 The code is Apache-2.0: https://github.com/vishalmysore/layaAsRagJudge
