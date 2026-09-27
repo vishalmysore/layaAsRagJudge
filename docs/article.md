@@ -70,6 +70,8 @@ The second pastes in a short product description and checks *"The Kestrel 5 can 
 
 The third is the interesting one. The claim is *"All API keys on an account share a single rate limit,"* and the top passage says the opposite: rate limits apply *separately to each key*. Laya gets this wrong and leans towards *supported*, at 0.64. The claim and the passage share nearly every word, and they differ only in logic, which is exactly where a model like this struggles. But 0.64 is close to a coin flip, so the gate doesn't act on it; it holds the claim for review. An LLM judge that simply said "PASS" would have waved the error through. Here the wrong verdict never gets acted on, because the model's own uncertainty flags it.
 
+![HOLD: Laya leans the wrong way on the API-keys claim, but too weakly to be acted on](images/13-live-contradiction-hold.png)
+
 That's the real argument for decision models as judges. They still make mistakes, but they make most of them where they're unsure, and they tell you when they're unsure.
 
 ## How good is it?

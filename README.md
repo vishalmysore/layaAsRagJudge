@@ -9,7 +9,9 @@ Two pages:
 - **Verify a claim** (`index.html`): one claim through the whole pipeline, with each step shown: the retrieved passages and their cosine scores, the exact typed question and state sent to Laya, the probabilities, the AUTO / BLOCK / HOLD gate, and the source document with the retrieved passages highlighted. Evidence can come from one corpus document, the whole corpus, or text you paste.
 - **Evaluate** (`rag-eval.html`): runs the pipeline over all 72 labeled claims and scores it against the gold labels. It reports accuracy, balanced accuracy, false-verification rate, AUROC, evidence recall@k, a confidence-vs-coverage table, breakdowns by dataset and by claim type, and median / p95 latency. Moving the sliders re-scores the stored run without calling the model again.
 
-Until the models are loaded, both pages play back results recorded from the same models (`web/recorded.json`).
+- **Router** (`router.html`): a RAG router. Laya decides which knowledge base (Encyclopedia, News or Policy RAG) should answer a question, or whether to skip retrieval. Retrieval then runs inside the chosen knowledge base, and a second Laya question checks whether the passages actually answer it. See [RAG router](#rag-router) below.
+
+Until the models are loaded, all pages play back results recorded from the same models (`web/recorded.json`, `web/router-recorded.json`).
 
 ## Pipeline
 
@@ -57,6 +59,39 @@ What these numbers say:
 - **The requirements' 0.90 confidence default does not fit this checkpoint.** Its probabilities are compressed: a verdict of p = 0.83 has an entropy confidence of only 0.34, and no claim in the sample reaches 0.5. The default gate is therefore **0.10**, which acts automatically on 44% of claims at 84% accuracy and holds the rest for review.
 
 Caveats: 72 hand-written claims is a smoke test, not a benchmark. The "best cutoff" hint on the Evaluate page is fit on the same claims, so it is optimistic. Latency was measured in a background browser tab (median ≈ 2.6 s per judgment on 4 WASM threads) and is faster in a foreground tab or on WebGPU with the int4 build.
+
+## RAG router
+
+`router.html` routes each question to one of four places, defined in `web/router.json`:
+
+| Route | Knowledge base | Retriever |
+|---|---|---|
+| Encyclopedia RAG | encyclopedia articles | dense (MiniLM cosine), top 3 |
+| News RAG | news reports | dense (MiniLM cosine), top 3 |
+| Policy RAG | policies and docs | **hybrid** (cosine + BM25), top 3, because exact terms and numbers matter |
+| No retrieval | none | small talk, maths, writing or coding help |
+
+It uses two typed Laya questions: a **routing** choice over the four routes, and an **answer check** ("do these passages contain the answer?") after retrieval.
+
+The first version routed to the single most likely option, and that worked badly (78% end to end). The run showed why. Among the three knowledge bases, Laya picks the right one **23 times out of 24**. But "no retrieval" versus "look it up" overlaps: knowledge questions got p(No retrieval) of 0.28–0.54, small talk 0.48–0.75. So the router now makes two separate decisions (`web/router-core.js`):
+
+1. **Skip retrieval only when p(No retrieval) ≥ 0.60.** Anything less gets searched, and the answer check, which rejects small talk reliably, decides whether anything useful came back.
+2. **Choose the knowledge base among the three KB options alone.** If the leader has less than 55% of the knowledge-base probability, search the top two instead of guessing.
+
+Results on 32 labeled questions (8 per route; 6 answerable and 2 unanswerable in each knowledge base), int8 build, WASM:
+
+| | |
+|---|---|
+| Right final outcome (end to end) | **94%** (30/32) |
+| Knowledge-base choice | 96% (23/24) |
+| Right knowledge base searched (incl. 10 fan-outs) | 100% |
+| Knowledge questions wrongly skipped | 0 |
+| Answer check (answerable or not) | 96% |
+| Answer retrieved in the top 3 | 100% |
+
+Both remaining errors are answer-check misses: a passage about online returns was accepted as answering a question about physical stores (p 0.82), and "What is 17 × 23?" scored 0.52 against an encyclopedia passage. The 0.60 and 0.55 defaults were chosen after looking at these same 32 questions, so 94% is optimistic; the untuned first design scored 78%. The sliders re-score the stored results instantly.
+
+To refresh `web/router-recorded.json` after changing `router.json` (a unit test fails when the routing or answer-check wording changes), load the models on the Router page, press **Run all questions**, then run `copy(JSON.stringify(__lrj.routerRecorded()))` in the console.
 
 ## The sample corpus
 

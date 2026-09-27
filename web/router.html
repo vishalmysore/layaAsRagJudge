@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laya RAG Router</title>
+<meta name="description" content="A RAG router in the browser: the Laya typed-decision model picks which knowledge base answers a question, then checks whether the retrieved passages actually answer it. Nothing leaves the page.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f766e'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="./coi.js"></script>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect width="32" height="32" rx="7" class="logo-bg"/><path d="M9 16.5l4.5 4.5L23 11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <h1>Laya RAG Judge</h1>
+      <p>Route each question to the right knowledge base, in your browser</p>
+    </div>
+  </div>
+  <div class="topright">
+    <nav class="nav" aria-label="Pages"><a href="./index.html">Verify a claim</a><a href="./rag-eval.html">Evaluate</a><a href="./router.html" aria-current="page">Router</a></nav>
+    <div class="modelpill" id="modelPill" role="status"><span class="dot"></span><span id="modelPillText">Models not loaded</span></div>
+  </div>
+</header>
+
+<section class="card modelcard" id="modelCard">
+  <div class="modelrow">
+    <div class="field">
+      <label for="variant">Judge model build (Laya)</label>
+      <select id="variant"><option>Reading manifest…</option></select>
+    </div>
+    <div class="field">
+      <label for="backend">Backend</label>
+      <select id="backend">
+        <option value="auto">Auto (WebGPU for int4, else WASM)</option>
+        <option value="wasm">WASM (CPU)</option>
+        <option value="webgpu">WebGPU (int4 build only)</option>
+      </select>
+    </div>
+    <button id="loadBtn" class="primary" disabled>Load models</button>
+  </div>
+  <div class="progress" id="progress" hidden><div id="progressBar"></div></div>
+  <p class="status" id="status">Router and answer check: <a id="modelLink" target="_blank" rel="noopener"></a>. Retriever: <a id="embedLink" target="_blank" rel="noopener"></a><span id="embedState"></span>. Until the models are loaded, the sample questions play back results recorded from the same models.</p>
+  <div class="badges" id="badges"></div>
+</section>
+
+<div class="layout">
+  <aside class="side">
+    <section class="card">
+      <h2>Knowledge bases</h2>
+      <ul class="routes" id="routes"></ul>
+    </section>
+    <section class="card">
+      <div class="field">
+        <label>Sample questions (the correct route is in brackets)</label>
+        <div class="examples" id="examples" aria-label="Sample questions"></div>
+      </div>
+      <div class="field">
+        <label for="question">Question</label>
+        <textarea id="question" rows="3" spellcheck="false" placeholder="Ask anything: a question about the documents, or something else entirely"></textarea>
+      </div>
+      <div class="field">
+        <label for="decl">Skip retrieval when p(No retrieval) ≥ <b id="declVal">0.60</b></label>
+        <input type="range" id="decl" min="0.3" max="0.95" step="0.01" value="0.6">
+        <p class="hint">Below this the question is searched anyway, and the answer check decides whether anything useful came back.</p>
+      </div>
+      <div class="field">
+        <label for="kbt">Search one knowledge base when its share ≥ <b id="kbtVal">0.55</b></label>
+        <input type="range" id="kbt" min="0.34" max="0.9" step="0.01" value="0.55">
+        <p class="hint">Share = the leading knowledge base's probability divided by the total over the three knowledge bases. Below this, the router searches the top two instead of guessing.</p>
+      </div>
+      <div class="field">
+        <label for="acut">Say "answer found" when p(answered) ≥ <b id="acutVal">0.50</b></label>
+        <input type="range" id="acut" min="0.1" max="0.9" step="0.01" value="0.5">
+        <p class="hint">All three sliders re-route the stored results instantly, with no model call.</p>
+      </div>
+      <div class="btnrow">
+        <button id="routeBtn" class="primary">Route question</button>
+      </div>
+      <p class="hint" id="runHint"></p>
+    </section>
+  </aside>
+
+  <main class="main">
+    <section class="card" id="resultCard">
+      <div class="placeholder" id="placeholder">Pick a sample question or ask your own, then press <b>Route question</b>.</div>
+      <div id="result" hidden>
+        <div id="outcome"></div>
+        <h3 class="step">1 · Router <span class="meta" id="routerMeta"></span></h3>
+        <div class="routeflow" id="routeflow"></div>
+        <div id="routeProbs"></div>
+        <details><summary>Exact text Laya reads for the routing decision</summary><p class="hint" id="rseqNote"></p><pre id="rseq" style="white-space:pre-wrap"></pre></details>
+        <h3 class="step">2 · Retrieval and answer check <span class="meta" id="searchMeta"></span></h3>
+        <div id="searched"></div>
+      </div>
+    </section>
+
+    <section class="card" id="evalCard">
+      <div class="toolbar"><h2 style="margin:0">Router evaluation</h2><span class="caption" id="evalMeta"></span></div>
+      <div class="runbar" style="margin:4px 0 10px">
+        <button id="runAllBtn">Run all questions</button>
+        <button id="stopBtn" disabled>Stop</button>
+        <div class="progress" id="evalProgress"><div id="evalBar" style="height:100%;width:0;background:var(--accent);transition:width .2s"></div></div>
+        <span class="count" id="evalCount">–</span>
+      </div>
+      <div class="kpis" id="rkpis"></div>
+      <div class="two">
+        <div><h2>Where questions were routed</h2><div class="tablewrap" id="confusion"></div><p class="caption">Rows: the correct route. Columns: where the router sent it ("No retrieval" only when retrieval was skipped outright). The diagonal is right.</p></div>
+        <div><h2>Per route</h2><div class="tablewrap" id="perRoute"></div></div>
+      </div>
+      <h2 style="margin-top:14px">Every question</h2>
+      <div class="tablewrap"><table class="grid" id="rtable"></table></div>
+      <p class="caption">Click a row to open that question above.</p>
+    </section>
+  </main>
+</div>
+
+<footer class="foot">
+  Laya RAG Judge · Apache-2.0 · Router and answer check: <a href="https://huggingface.co/VishalMysore/layaForWebTrained" target="_blank" rel="noopener">Laya typed-decisions (browser build)</a>, derived from <a href="https://huggingface.co/convaiinnovations/laya-typed-decisions" target="_blank" rel="noopener">ConvAI Innovations' Laya</a>. The knowledge bases hold fictional documents written for this demo, and all questions are synthetic. <a href="./NOTICE.txt">Notices</a>.
+</footer>
+<script type="module" src="./router.js"></script>
+</body>
+</html>

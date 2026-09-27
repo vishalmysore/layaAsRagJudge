@@ -2,9 +2,10 @@
 //   load corpus -> chunk each document -> embed each chunk into IndexedDB -> embed the claim -> cosine top-k
 //   -> one typed Laya question (claim + retrieved passages) -> p(supported) -> gate.
 import * as db from "./store.js";
-import { chunkText, chunkConfigKey, topK, evidenceRetrieved, RAG_DEFAULTS } from "./rag.js";
+import { chunkText, chunkConfigKey, topK, hybridTopK, evidenceRetrieved, RAG_DEFAULTS } from "./rag.js";
 import { PRESETS, buildState, interpret, questionKey } from "./judge.js";
 import { buildSequence, toInternal } from "./laya-core.js";
+import { routerQuestion, ANSWER_CHECK } from "./router-core.js";
 
 const CORPUS_URL = "./corpus.json";
 
@@ -142,6 +143,77 @@ export function compactRun(run) {
       layaMs: Math.round(r.layaMs), embedMs: Math.round(r.embedMs), evidenceHit: r.evidenceHit,
     })),
   };
+}
+
+// ---- RAG router ------------------------------------------------------------------------------------
+
+export const ROUTER_RAG = { sentencesPerChunk: 2, overlap: 0 }; // every route shares one passage index
+
+/** Ask Laya which knowledge base should handle the question. */
+export async function routeQuestion(laya, question, routes) {
+  const q = routerQuestion(routes);
+  const res = await laya.systemOne({ question: String(question).trim() }, { route: q });
+  return { probs: res.answers.route.probabilities, ms: res.latency_ms, question: q, input: modelInput(laya, { question: String(question).trim() }, q) };
+}
+
+/** Retrieve inside one route's knowledge base, with that route's retriever (dense cosine, or hybrid cosine + BM25). */
+export async function retrieveInRoute(embedder, question, route) {
+  const { vec } = await claimVector(embedder, question);
+  const pool = (await db.passages(passageCfg(embedder, ROUTER_RAG))).filter((p) => p.dataset === route.dataset);
+  const ranked = route.retriever === "hybrid"
+    ? hybridTopK(question, vec, pool, route.k)
+    : topK(vec, pool, route.k).map((x) => ({ ...x, cosine: x.score }));
+  return ranked.map(({ item, score, cosine, keyword }) => ({ docId: item.docId, chunk: item.chunk, text: item.text, score, cosine, keyword: keyword ?? null }));
+}
+
+/** Ask Laya whether the retrieved passages actually answer the question. */
+export async function answerCheck(laya, question, passages) {
+  const state = { question: String(question).trim(), passages: passages.map((p) => p.text) };
+  const res = await laya.systemOne(state, { answer: ANSWER_CHECK });
+  return { pAnswered: res.answers.answer.probabilities.answered, ms: res.latency_ms };
+}
+
+/**
+ * The full router for one question: route, then retrieve + answer-check in the two most likely knowledge bases
+ * (whichever of them the decision ends up searching), so moving a slider never needs another model call.
+ */
+export async function runRouter({ laya, embedder, routes, question, onStep = () => {} }) {
+  onStep("Routing…");
+  const r = await routeQuestion(laya, question, routes);
+  const kb = Object.entries(r.probs).filter(([id]) => id !== "none").sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id]) => id);
+  const perRoute = {};
+  for (const id of kb) {
+    const route = routes.find((x) => x.id === id);
+    onStep(`Searching ${route.name}…`);
+    const passages = await retrieveInRoute(embedder, question, route);
+    onStep(`Checking whether ${route.name} answers it…`);
+    const c = await answerCheck(laya, question, passages);
+    perRoute[id] = { passages, pAnswered: c.pAnswered, checkMs: c.ms };
+  }
+  return { question, routeProbs: r.probs, routerMs: r.ms, routerInput: r.input, perRoute };
+}
+
+/** Compact / expand router records for router-recorded.json (passage text rebuilt from the corpus). */
+export function compactRouterRecord(rec) {
+  const r4 = (x) => (x == null ? null : Math.round(x * 1e4) / 1e4);
+  return {
+    id: rec.id, routeProbs: Object.fromEntries(Object.entries(rec.routeProbs).map(([k, v]) => [k, r4(v)])), routerMs: Math.round(rec.routerMs),
+    perRoute: Object.fromEntries(Object.entries(rec.perRoute).map(([id, x]) => [id, { pAnswered: r4(x.pAnswered), checkMs: Math.round(x.checkMs),
+      passages: x.passages.map((p) => ({ docId: p.docId, chunk: p.chunk, score: r4(p.score), cosine: r4(p.cosine), keyword: r4(p.keyword) })) }])),
+  };
+}
+export function expandRouterRecorded(recorded, corpus, router) {
+  if (!recorded) return null;
+  const cache = new Map();
+  const textOf = (docId, chunk) => {
+    if (!cache.has(docId)) cache.set(docId, corpus.documents[docId] ? chunkText(corpus.documents[docId].text, ROUTER_RAG) : []);
+    return cache.get(docId)[chunk]?.text;
+  };
+  const byId = new Map(router.questions.map((q) => [q.id, q]));
+  const records = recorded.records.map((r) => ({ ...byId.get(r.id), ...r,
+    perRoute: Object.fromEntries(Object.entries(r.perRoute).map(([id, x]) => [id, { ...x, passages: x.passages.map((p) => ({ ...p, text: textOf(p.docId, p.chunk) })) }])) }))
+    .filter((r) => r.question && Object.values(r.perRoute).every((x) => x.passages.every((p) => p.text)));
+  return { ...recorded, records };
 }
 
 export { evidenceRetrieved };

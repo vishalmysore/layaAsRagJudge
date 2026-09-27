@@ -1,0 +1,67 @@
+{
+  "name": "Laya RAG router sample v1",
+  "description": "Questions for the RAG router, written for this demo. Each has the route that should handle it and, for knowledge questions, whether the answer is in that knowledge base (with the verbatim evidence span when it is). Knowledge-base questions are about the fictional documents in corpus.json.",
+  "routes": [
+    {
+      "id": "encyclopedia", "name": "Encyclopedia RAG", "dataset": "encyclopedic",
+      "description": "Encyclopedia articles: history of places, landmarks, buildings, people, food and nature",
+      "retriever": "dense", "k": 3,
+      "note": "Dense retrieval (MiniLM cosine) over encyclopedia passages"
+    },
+    {
+      "id": "news", "name": "News RAG", "dataset": "news",
+      "description": "News reports: recent events, local politics, company results, storms, studies, sport and health services",
+      "retriever": "dense", "k": 3,
+      "note": "Dense retrieval (MiniLM cosine) over news passages"
+    },
+    {
+      "id": "policy", "name": "Policy RAG", "dataset": "policy",
+      "description": "Policies and documentation: rules, terms, returns, leave, insurance cover, API limits, library and house rules",
+      "retriever": "hybrid", "k": 3,
+      "note": "Hybrid retrieval: MiniLM cosine plus BM25 keywords, because exact terms and numbers matter in policy text"
+    },
+    {
+      "id": "none", "name": "No retrieval", "dataset": null,
+      "description": "Not a question about our documents: small talk, maths, jokes, writing or coding help",
+      "retriever": null, "k": 0,
+      "note": "Nothing to look up: the assistant answers directly or declines"
+    }
+  ],
+  "questions": [
+    { "id": "q-enc-1", "question": "When was Varnholt Lighthouse first lit?", "route": "encyclopedia", "docId": "enc-lighthouse", "answerable": true, "evidence": "first lit in 1868" },
+    { "id": "q-enc-2", "question": "What was the Sorrel Valley Railway originally built to carry?", "route": "encyclopedia", "docId": "enc-railway", "answerable": true, "evidence": "to carry slate from the Fenwick quarries" },
+    { "id": "q-enc-3", "question": "Where did Helena Castellan study chemistry?", "route": "encyclopedia", "docId": "enc-castellan", "answerable": true, "evidence": "studied chemistry at the University of Edinburgh" },
+    { "id": "q-enc-4", "question": "How long is the main span of the Mirelle Bridge?", "route": "encyclopedia", "docId": "enc-bridge", "answerable": true, "evidence": "main span of 410 metres" },
+    { "id": "q-enc-5", "question": "What kind of milk is Orvik cheese made from?", "route": "encyclopedia", "docId": "enc-cheese", "answerable": true, "evidence": "made from raw sheep's milk" },
+    { "id": "q-enc-6", "question": "How deep is Lake Imber?", "route": "encyclopedia", "docId": "enc-lake", "answerable": true, "evidence": "maximum depth of 118 metres" },
+    { "id": "q-enc-7", "question": "Who painted the Varnholt Lighthouse tower red?", "route": "encyclopedia", "docId": "enc-lighthouse", "answerable": false, "evidence": null },
+    { "id": "q-enc-8", "question": "Which fish were introduced into Lake Imber in the 1950s?", "route": "encyclopedia", "docId": "enc-lake", "answerable": false, "evidence": null },
+
+    { "id": "q-news-1", "question": "How did the Harlow Bay council vote on the bike lanes?", "route": "news", "docId": "news-bikelanes", "answerable": true, "evidence": "voted 7 to 2" },
+    { "id": "q-news-2", "question": "How much profit did Brightwater Foods make last quarter?", "route": "news", "docId": "news-earnings", "answerable": true, "evidence": "net profit of 46 million dollars" },
+    { "id": "q-news-3", "question": "How many homes lost power during Storm Elin?", "route": "news", "docId": "news-storm", "answerable": true, "evidence": "cutting power to around 60,000 homes" },
+    { "id": "q-news-4", "question": "How much more sleep did students get when school started later?", "route": "news", "docId": "news-sleep", "answerable": true, "evidence": "slept an average of 34 minutes more per night" },
+    { "id": "q-news-5", "question": "Who scored twice for Riverside United in the cup final?", "route": "news", "docId": "news-cup", "answerable": true, "evidence": "Substitute Kai Osei scored twice" },
+    { "id": "q-news-6", "question": "What hours will the new walk-in clinics be open?", "route": "news", "docId": "news-clinics", "answerable": true, "evidence": "open from 8 am to 10 pm every day" },
+    { "id": "q-news-7", "question": "Which company won the contract to build the Harlow Bay bike lanes?", "route": "news", "docId": "news-bikelanes", "answerable": false, "evidence": null },
+    { "id": "q-news-8", "question": "How much did the clean-up after Storm Elin cost?", "route": "news", "docId": "news-storm", "answerable": false, "evidence": null },
+
+    { "id": "q-pol-1", "question": "How long do I have to return an item to Lumen Home?", "route": "policy", "docId": "pol-returns", "answerable": true, "evidence": "within 30 days of delivery" },
+    { "id": "q-pol-2", "question": "How many days of annual leave do full-time employees get?", "route": "policy", "docId": "pol-leave", "answerable": true, "evidence": "25 days of paid annual leave" },
+    { "id": "q-pol-3", "question": "What happens if I go over the Parcelly API rate limit?", "route": "policy", "docId": "pol-api", "answerable": true, "evidence": "receive an HTTP 429 response" },
+    { "id": "q-pol-4", "question": "How many items can I borrow from the Carden County library at once?", "route": "policy", "docId": "pol-library", "answerable": true, "evidence": "borrow up to 15 items at a time" },
+    { "id": "q-pol-5", "question": "Does Voyager Basic travel insurance cover skiing injuries?", "route": "policy", "docId": "pol-insurance", "answerable": true, "evidence": "unless the optional Adventure Pack is added" },
+    { "id": "q-pol-6", "question": "Am I allowed to keep a dog at Linden Court?", "route": "policy", "docId": "pol-house", "answerable": true, "evidence": "dogs under 15 kilograms are allowed" },
+    { "id": "q-pol-7", "question": "Can I return a Lumen Home order to one of their physical stores?", "route": "policy", "docId": "pol-returns", "answerable": false, "evidence": null },
+    { "id": "q-pol-8", "question": "Is parental leave paid at full salary?", "route": "policy", "docId": "pol-leave", "answerable": false, "evidence": null },
+
+    { "id": "q-none-1", "question": "Hi there, how are you today?", "route": "none", "docId": null, "answerable": null, "evidence": null },
+    { "id": "q-none-2", "question": "What is 17 multiplied by 23?", "route": "none", "docId": null, "answerable": null, "evidence": null },
+    { "id": "q-none-3", "question": "Write a short poem about autumn.", "route": "none", "docId": null, "answerable": null, "evidence": null },
+    { "id": "q-none-4", "question": "How do I reverse a list in Python?", "route": "none", "docId": null, "answerable": null, "evidence": null },
+    { "id": "q-none-5", "question": "Can you translate 'good morning' into French?", "route": "none", "docId": null, "answerable": null, "evidence": null },
+    { "id": "q-none-6", "question": "Tell me a joke about cats.", "route": "none", "docId": null, "answerable": null, "evidence": null },
+    { "id": "q-none-7", "question": "Thanks, that's all I needed!", "route": "none", "docId": null, "answerable": null, "evidence": null },
+    { "id": "q-none-8", "question": "What's your favourite colour?", "route": "none", "docId": null, "answerable": null, "evidence": null }
+  ]
+}
